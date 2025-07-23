@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -10,15 +11,15 @@ import {
   View,
 } from 'react-native';
 
+const IndexScreen = () => {
+  const router = useRouter();
 
-const App = () => {
   const [team1, setTeam1] = useState('');
   const [team2, setTeam2] = useState('');
   const [playersTeam1, setPlayersTeam1] = useState<string[]>([]);
   const [playersTeam2, setPlayersTeam2] = useState<string[]>([]);
   const [playerName1, setPlayerName1] = useState('');
   const [playerName2, setPlayerName2] = useState('');
-
   const [showPlayers, setShowPlayers] = useState(true);
   const [selectedTossWinner, setSelectedTossWinner] = useState<'team1' | 'team2' | null>(null);
   const [choice, setChoice] = useState<'Raid' | 'Ground' | null>(null);
@@ -57,7 +58,20 @@ const App = () => {
       Alert.alert('Error', 'Please complete toss and raid/ground selections');
       return;
     }
-    Alert.alert('Match Ready', 'All settings are valid. Starting the match!');
+    router.push({
+      pathname: '/scorescreen',
+      params: {
+        team1,
+        team2,
+        playersTeam1: JSON.stringify(playersTeam1),
+        playersTeam2: JSON.stringify(playersTeam2),
+        selectedTossWinner,
+        choice,
+        time,
+    bonusAllowed: bonusAllowed.toString(),    
+    superTackleAllowed: superTackleAllowed.toString(),
+      },
+    });
   };
 
   const getToggleStyle = (selected: boolean) => [
@@ -67,8 +81,7 @@ const App = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
-      <Text style={styles.header}>Kabaddi Match Setup</Text>
-
+      {/* <Text style={styles.header}>Kabaddi Match Setup</Text> */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Teams</Text>
         <TextInput
@@ -124,7 +137,6 @@ const App = () => {
                     <Text style={styles.removeText}>Remove</Text>
                   </TouchableOpacity>
                 </View>
-                
               ))}
               {playersTeam2.length < 7 && (
                 <>
@@ -206,8 +218,7 @@ const App = () => {
 
       <View style={styles.section}>
         <TouchableOpacity onPress={() => setShowAdvanced(!showAdvanced)}>
-          <Text style={styles.sectionTitle} >Advanced Settings {showAdvanced ? '▲' : '▼'}</Text>
-
+          <Text style={styles.sectionTitle}>Advanced Settings {showAdvanced ? '▲' : '▼'}</Text>
         </TouchableOpacity>
         {showAdvanced && (
           <>
@@ -236,7 +247,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   subTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
-  teamHeader: { fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 10,minHeight:40 },
+  teamHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, minHeight: 40 },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -249,8 +260,6 @@ const styles = StyleSheet.create({
   playerRowWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   playerRowItemWrap: {
     flexDirection: 'column',
-    // justifyContent: 'space-between',
-    // alignItems: 'center',
     flexWrap: 'wrap',
     marginBottom: 5,
   },
@@ -258,21 +267,20 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     flexWrap: 'wrap',
     color: '#000',
-    
   },
-  removeText: {  color: 'red',
-  fontSize: 10,
-  borderColor: 'red',
-  borderWidth: 1,
-  textAlign: 'center',
-  borderRadius: 4,
-  marginTop: 1,
-  paddingHorizontal: 5,
-  marginLeft: 10,
-  width:"auto",             // 👈 fixed width
-  alignSelf: 'flex-start',
-
- },
+  removeText: {
+    color: 'red',
+    fontSize: 10,
+    borderColor: 'red',
+    borderWidth: 1,
+    textAlign: 'center',
+    borderRadius: 4,
+    marginTop: 1,
+    paddingHorizontal: 5,
+    marginLeft: 10,
+    width: 'auto',
+    alignSelf: 'flex-start',
+  },
   addButton: {
     backgroundColor: '#007bff',
     padding: 10,
@@ -324,4 +332,4 @@ const styles = StyleSheet.create({
   startButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
 
-export default App;
+export default IndexScreen;
