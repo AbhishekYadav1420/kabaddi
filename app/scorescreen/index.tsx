@@ -3,12 +3,11 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 
@@ -48,6 +47,12 @@ export default function ScoreScreen() {
   const [matchRunning, setMatchRunning] = useState(false);
   const matchInterval = useRef<NodeJS.Timeout | null>(null);
 
+  const [timeoutTimer, setTimeoutTimer] = useState(30);
+  const [timeoutRunning, setTimeoutRunning] = useState(false);
+  const timeoutInterval = useRef<NodeJS.Timeout | null>(null);
+
+  const [gamePhase, setGamePhase] = useState<'first' | 'halftime' | 'second' | 'ended'>('first');
+
   const [team1RaidTimer, setTeam1RaidTimer] = useState(30);
   const [team1RaidRunning, setTeam1RaidRunning] = useState(false);
   const team1RaidInterval = useRef<NodeJS.Timeout | null>(null);
@@ -64,14 +69,13 @@ export default function ScoreScreen() {
   const [team2DropdownValue, setTeam2DropdownValue] = useState(null);
   const [team2DropdownItems, setTeam2DropdownItems] = useState<any[]>([]);
 
-  // Match Timer Effect
   useEffect(() => {
     if (matchRunning) {
       matchInterval.current = setInterval(() => {
         setMatchTimer((prev) => {
           if (prev === 1) {
-            setMatchRunning(false);
             clearInterval(matchInterval.current!);
+            setMatchRunning(false);
             return 0;
           }
           return prev - 1;
@@ -85,26 +89,49 @@ export default function ScoreScreen() {
     };
   }, [matchRunning]);
 
-  // Raid Timer Effects
   useEffect(() => {
-    if (team1RaidRunning) {
-      team1RaidInterval.current = setInterval(() => {
-        setTeam1RaidTimer((prev) => {
+    if (timeoutRunning) {
+      timeoutInterval.current = setInterval(() => {
+        setTimeoutTimer((prev) => {
           if (prev === 1) {
-            setTeam1RaidRunning(false);
-            clearInterval(team1RaidInterval.current!);
-            setTeam1RaidTimer(30);
+            clearInterval(timeoutInterval.current!);
+            setTimeoutRunning(false);
+            setTimeoutTimer(30);
             return 30;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (team1RaidInterval.current) clearInterval(team1RaidInterval.current);
+      if (timeoutInterval.current) clearInterval(timeoutInterval.current);
     }
     return () => {
-      if (team1RaidInterval.current) clearInterval(team1RaidInterval.current);
+      if (timeoutInterval.current) clearInterval(timeoutInterval.current);
     };
+  }, [timeoutRunning]);
+
+  useEffect(() => {
+    setTeam1DropdownItems(team1Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
+    setTeam2DropdownItems(team2Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
+  }, [team1Players, team2Players]);
+
+  useEffect(() => {
+    if (team1RaidRunning) {
+      team1RaidInterval.current = setInterval(() => {
+        setTeam1RaidTimer((prev) => {
+          if (prev === 1) {
+            clearInterval(team1RaidInterval.current!);
+            setTeam1RaidRunning(false);
+            return 30;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(team1RaidInterval.current!);
+      setTeam1RaidTimer(30);
+    }
+    return () => clearInterval(team1RaidInterval.current!);
   }, [team1RaidRunning]);
 
   useEffect(() => {
@@ -112,27 +139,19 @@ export default function ScoreScreen() {
       team2RaidInterval.current = setInterval(() => {
         setTeam2RaidTimer((prev) => {
           if (prev === 1) {
-            setTeam2RaidRunning(false);
             clearInterval(team2RaidInterval.current!);
-            setTeam2RaidTimer(30);
+            setTeam2RaidRunning(false);
             return 30;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (team2RaidInterval.current) clearInterval(team2RaidInterval.current);
+      clearInterval(team2RaidInterval.current!);
+      setTeam2RaidTimer(30);
     }
-    return () => {
-      if (team2RaidInterval.current) clearInterval(team2RaidInterval.current);
-    };
+    return () => clearInterval(team2RaidInterval.current!);
   }, [team2RaidRunning]);
-
-  // Update dropdowns dynamically
-  useEffect(() => {
-    setTeam1DropdownItems(team1Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
-    setTeam2DropdownItems(team2Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
-  }, [team1Players, team2Players]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0');
@@ -140,46 +159,19 @@ export default function ScoreScreen() {
     return `${m}:${sec}`;
   };
 
-  const handleOut = (team: 1 | 2, index: number) => {
-    if (team === 1) {
-      const updated = [...team1Players];
-      updated[index].out = true;
-      setTeam1Players(updated);
+  const handleHalfTimePress = () => {
+    setMatchTimer(matchTime);
+    setGamePhase('halftime');
+    setMatchRunning(false);
+  };
 
-      // revive opponent
-      const revive = [...team2Players];
-      const outIndex = revive.findIndex(p => p.out);
-      if (outIndex !== -1) {
-        revive[outIndex].out = false;
-        setTeam2Players(revive);
-      }
+  const handleHalftimeEnd = () => {
+    setGamePhase('second');
+  };
 
-      // check for all-out
-      if (updated.every(p => p.out)) {
-        const revived = updated.map(p => ({ ...p, out: false }));
-        setTeam1Players(revived);
-        setTeam2Score(prev => prev + 2);
-      }
-    } else {
-      const updated = [...team2Players];
-      updated[index].out = true;
-      setTeam2Players(updated);
-
-      // revive opponent
-      const revive = [...team1Players];
-      const outIndex = revive.findIndex(p => p.out);
-      if (outIndex !== -1) {
-        revive[outIndex].out = false;
-        setTeam1Players(revive);
-      }
-
-      // check for all-out
-      if (updated.every(p => p.out)) {
-        const revived = updated.map(p => ({ ...p, out: false }));
-        setTeam2Players(revived);
-        setTeam1Score(prev => prev + 2);
-      }
-    }
+  const handleFullTime = () => {
+    setGamePhase('ended');
+    setMatchRunning(false);
   };
 
   const renderDots = (players: PlayerStatus[]) => (
@@ -218,11 +210,7 @@ export default function ScoreScreen() {
 
     const handleTackle = () => {
       const defenders = opponentPlayers.filter(p => !p.out).length;
-      if (defenders <= 3) {
-        handleScore(2); // super tackle
-      } else {
-        handleScore(1);
-      }
+      handleScore(defenders <= 3 ? 2 : 1);
     };
 
     return (
@@ -237,7 +225,7 @@ export default function ScoreScreen() {
         </View>
 
         <View style={styles.cardRow}>
-          <View style={styles.card}>
+          <View style={[styles.card, { flex: 2, marginRight: 6 }]}>
             {players.map((p, idx) => !p.out && (
               <View key={idx} style={styles.playerRow}>
                 <Text style={{ flex: 1 }}>{p.name}</Text>
@@ -248,7 +236,7 @@ export default function ScoreScreen() {
             ))}
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
             <DropDownPicker
               open={dropdownOpen}
               value={dropdownValue}
@@ -279,81 +267,142 @@ export default function ScoreScreen() {
     );
   };
 
+  const handleOut = (team: 1 | 2, index: number) => {
+    const current = team === 1 ? [...team1Players] : [...team2Players];
+    current[index].out = true;
+    team === 1 ? setTeam1Players(current) : setTeam2Players(current);
+
+    const opponent = team === 1 ? [...team2Players] : [...team1Players];
+    const reviveIndex = opponent.findIndex(p => p.out);
+    if (reviveIndex !== -1) {
+      opponent[reviveIndex].out = false;
+      team === 1 ? setTeam2Players(opponent) : setTeam1Players(opponent);
+    }
+
+    if (current.every(p => p.out)) {
+      const revived = current.map(p => ({ ...p, out: false }));
+      team === 1 ? setTeam1Players(revived) : setTeam2Players(revived);
+      team === 1 ? setTeam2Score(s => s + 2) : setTeam1Score(s => s + 2);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Section 1 */}
-      <View style={styles.section1}>
-        <Text style={styles.title}>{team1Name} - {team1Score} | {team2Score} - {team2Name}</Text>
-        <Text style={styles.timer}>{formatTime(matchTimer)}</Text>
-        <TouchableOpacity onPress={() => setMatchRunning(prev => !prev)} style={styles.controlBtn}>
-          <Text style={styles.controlBtnText}>{matchRunning ? 'Pause' : 'Start'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity disabled={matchTimer > 0} onPress={() => Alert.alert('Half Time')} style={styles.controlBtn}>
-          <Text style={styles.controlBtnText}>Half Time</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => Alert.alert('Timeout', '30 sec timeout')} style={styles.controlBtn}>
-          <Text style={styles.controlBtnText}>Timeout</Text>
-        </TouchableOpacity>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+        <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>
+            {team1Name} | {team2Name}
+          </Text>
+          <Text style={{ fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginTop: 4 }}>
+            {team1Score.toString().padStart(2, '0')} : {team2Score.toString().padStart(2, '0')}
+          </Text>
+        </View>
+
+        <View style={[styles.card, { flex: 1, marginLeft: 5, alignItems: 'center' }]}>
+          {gamePhase !== 'ended' ? (
+            <>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>
+                {formatTime(matchTimer)}
+              </Text>
+              <TouchableOpacity
+                style={[styles.controlBtn, { backgroundColor: '#2196F3' }]}
+                onPress={() => setMatchRunning(prev => !prev)}
+                disabled={gamePhase === 'halftime'}
+              >
+                <Text style={styles.controlBtnText}>
+                  {matchRunning ? 'Pause' : 'Start'}
+                </Text>
+              </TouchableOpacity>
+
+              {gamePhase === 'first' && (
+                <TouchableOpacity
+                  style={styles.controlBtn}
+                  disabled={matchTimer > 0}
+                  onPress={handleHalfTimePress}
+                >
+                  <Text style={styles.controlBtnText}>Half Time</Text>
+                </TouchableOpacity>
+              )}
+
+              {gamePhase === 'halftime' && (
+                <TouchableOpacity
+                  style={styles.controlBtn}
+                  onPress={handleHalftimeEnd}
+                >
+                  <Text style={styles.controlBtnText}>Halftime End</Text>
+                </TouchableOpacity>
+              )}
+
+              {gamePhase === 'second' && (
+                <TouchableOpacity
+                  style={styles.controlBtn}
+                  disabled={matchTimer > 0}
+                  onPress={handleFullTime}
+                >
+                  <Text style={styles.controlBtnText}>Full Time</Text>
+                </TouchableOpacity>
+              )}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setTimeoutRunning(true)}
+                  style={[styles.controlBtn, { paddingHorizontal: 16 }]}
+                >
+                  <Text style={styles.controlBtnText}>Timeout</Text>
+                </TouchableOpacity>
+                {timeoutRunning && (
+                  <Text style={{ marginLeft: 10, fontSize: 16 }}>{timeoutTimer}s</Text>
+                )}
+              </View>
+            </>
+          ) : (
+            <Text style={{ fontSize: 22, fontWeight: 'bold', color: 'red' }}>Match Over!</Text>
+          )}
+        </View>
       </View>
 
-      {/* Section 2 */}
       {renderTeamSection(
-        1,
-        team1Name,
-        team1Players,
-        setTeam1Players,
-        team1Score,
-        setTeam1Score,
-        team1RaidTimer,
-        team1RaidRunning,
-        setTeam1RaidRunning,
-        team1DropdownOpen,
-        setTeam1DropdownOpen,
-        team1DropdownValue,
-        setTeam1DropdownValue,
-        team1DropdownItems,
-        setTeam1DropdownItems,
+        1, team1Name, team1Players, setTeam1Players, team1Score, setTeam1Score,
+        team1RaidTimer, team1RaidRunning, setTeam1RaidRunning,
+        team1DropdownOpen, setTeam1DropdownOpen,
+        team1DropdownValue, setTeam1DropdownValue,
+        team1DropdownItems, setTeam1DropdownItems,
         team2Players
       )}
 
-      {/* Section 3 */}
       {renderTeamSection(
-        2,
-        team2Name,
-        team2Players,
-        setTeam2Players,
-        team2Score,
-        setTeam2Score,
-        team2RaidTimer,
-        team2RaidRunning,
-        setTeam2RaidRunning,
-        team2DropdownOpen,
-        setTeam2DropdownOpen,
-        team2DropdownValue,
-        setTeam2DropdownValue,
-        team2DropdownItems,
-        setTeam2DropdownItems,
+        2, team2Name, team2Players, setTeam2Players, team2Score, setTeam2Score,
+        team2RaidTimer, team2RaidRunning, setTeam2RaidRunning,
+        team2DropdownOpen, setTeam2DropdownOpen,
+        team2DropdownValue, setTeam2DropdownValue,
+        team2DropdownItems, setTeam2DropdownItems,
         team1Players
       )}
     </ScrollView>
   );
 }
 
+// app/scorescreen.tsx
+// [REMAINDER OF FILE ABOVE]
+
 const styles = StyleSheet.create({
   container: { padding: 10 },
-  section1: { alignItems: 'center', marginBottom: 10 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  timer: { fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
+  card: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+  },
   controlBtn: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#4CAF50',
     padding: 10,
     marginVertical: 4,
     borderRadius: 8,
-    width: '60%',
     alignItems: 'center',
   },
-  controlBtnText: { color: '#fff', fontWeight: 'bold' },
-
+  controlBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   teamSection: {
     marginBottom: 16,
     padding: 10,
@@ -375,14 +424,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   btnText: { color: 'white', fontWeight: 'bold' },
-
-  cardRow: { flexDirection: 'row', gap: 10 },
-  card: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 10,
-  },
+  cardRow: { flexDirection: 'row' },
   playerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -410,3 +452,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
