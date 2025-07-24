@@ -1,151 +1,125 @@
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ScoreScreen() {
-  const {
-    team1,
-    team2,
-    playersTeam1,
-    playersTeam2,
-    matchTime,
-  } = useLocalSearchParams();
+  const { team1, team2, time } = useLocalSearchParams();
 
-  const team1Players = (typeof playersTeam1 === 'string' ? playersTeam1.split(',') : playersTeam1) || [];
-  const team2Players = (typeof playersTeam2 === 'string' ? playersTeam2.split(',') : playersTeam2) || [];
-
+  // Team scores
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
-  const [timer, setTimer] = useState(Number(matchTime || 0) * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [activeTeam, setActiveTeam] = useState<'team1' | 'team2'>('team1');
-  const [team1Out, setTeam1Out] = useState(team1Players.map(() => false));
-  const [team2Out, setTeam2Out] = useState(team2Players.map(() => false));
-  const [isFirstHalf, setIsFirstHalf] = useState(true);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Main timer
+const timeStr = Array.isArray(time) ? time[0] : time || '20:00';
+const [matchSeconds, setMatchSeconds] = useState(() => {
+  const [min, sec] = timeStr.split(':').map(Number);
+  return min * 60 + sec;
+});
+
+  const [isRunning, setIsRunning] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  // Timeout timer
+  const [timeoutSeconds, setTimeoutSeconds] = useState(0);
+  const timeoutRef = useRef<number| null>(null);
+
+  // Half-time state
+  const [isHalfTimeEnabled, setIsHalfTimeEnabled] = useState(false);
 
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && matchSeconds > 0 && timeoutSeconds === 0) {
       timerRef.current = setInterval(() => {
-        setTimer((prev: number) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current!);
-            setIsRunning(false);
-            Alert.alert('Time up', 'Halftime or full time reached.');
-            if (isFirstHalf) {
-              setIsFirstHalf(false);
-              setActiveTeam(activeTeam === 'team1' ? 'team2' : 'team1');
-              setTimer(Number(matchTime || 0) * 60);
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
+        setMatchSeconds((prev) => prev - 1);
       }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current!);
-  }, [isRunning]);
+  }, [isRunning, matchSeconds, timeoutSeconds]);
 
-  const formatTime = (sec: number) => {
-    const minutes = Math.floor(sec / 60);
-    const seconds = sec % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds
-      .toString()
-      .padStart(2, '0')}`;
-  };
-
-  const toggleOut = (team: 'team1' | 'team2', index: number) => {
-    if (team === 'team1') {
-      const updated = [...team1Out];
-      updated[index] = !updated[index];
-      setTeam1Out(updated);
-    } else {
-      const updated = [...team2Out];
-      updated[index] = !updated[index];
-      setTeam2Out(updated);
+  useEffect(() => {
+    if (matchSeconds === 0) {
+      setIsRunning(false);
+      setIsHalfTimeEnabled(true);
     }
-  };
+  }, [matchSeconds]);
 
-  const renderPlayers = (team: 'team1' | 'team2') => {
-    const players = team === 'team1' ? team1Players : team2Players;
-    const outs = team === 'team1' ? team1Out : team2Out;
-    return players.map((player: string, i: number) => (
-      <TouchableOpacity
-        key={i}
-        style={[
-          styles.playerBox,
-          outs[i] ? styles.playerOut : styles.playerIn,
-        ]}
-        onPress={() => toggleOut(team, i)}>
-        <Text style={styles.playerText}>{player}</Text>
-      </TouchableOpacity>
-    ));
+  useEffect(() => {
+    if (timeoutSeconds > 0) {
+      timeoutRef.current = setInterval(() => {
+        setTimeoutSeconds((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timeoutRef.current!);
+  }, [timeoutSeconds]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.timerText}>{formatTime(timer)}</Text>
-
-      <View style={styles.scoreWrap}>
-        <View style={styles.teamScoreWrap}>
-          <Text style={styles.teamName}>{team1}</Text>
-          <Text style={styles.score}>{team1Score}</Text>
+      {/* Left: Team Names and Scores */}
+      <View style={styles.teamSection}>
+        <View style={styles.teamRow}>
+          <Text style={styles.teamName}>{team1 || 'Team A'}</Text>
+          <Text style={styles.vs}>|</Text>
+          <Text style={styles.teamName}>{team2 || 'Team B'}</Text>
         </View>
-        <View style={styles.teamScoreWrap}>
-          <Text style={styles.teamName}>{team2}</Text>
-          <Text style={styles.score}>{team2Score}</Text>
+        <View style={styles.scoreRow}>
+          <Text style={styles.score}>{team1Score.toString().padStart(2, '0')}</Text>
+          <Text style={styles.vs}>:</Text>
+          <Text style={styles.score}>{team2Score.toString().padStart(2, '0')}</Text>
         </View>
       </View>
 
-      <View style={styles.playersWrap}>
-        <View style={styles.teamPlayers}>{renderPlayers('team1')}</View>
-        <View style={styles.teamPlayers}>{renderPlayers('team2')}</View>
-      </View>
+      {/* Right: Timers and Buttons */}
+      <View style={styles.timerSection}>
+<View style={styles.row}>
+  <Text style={styles.mainTimer}>
+    <FontAwesome name="clock-o" size={20} /> {formatTime(matchSeconds)}
+  </Text>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.actionBtn}>
-          <FontAwesome5 name="running" size={20} color="white" />
-          <Text style={styles.actionText}>Raid</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <FontAwesome5 name="hand-rock" size={20} color="white" />
-          <Text style={styles.actionText}>Tackle</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <FontAwesome5 name="plus" size={20} color="white" />
-          <Text style={styles.actionText}>➕ Bonus</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <FontAwesome5 name="ban" size={20} color="white" />
-          <Text style={styles.actionText}>Foul</Text>
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity
+    style={styles.buttonInline}
+    onPress={() => setIsRunning((prev) => !prev)}
+  >
+    <Text style={styles.buttonText}>{isRunning ? 'Pause' : 'Start'}</Text>
+  </TouchableOpacity>
+</View>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.timerBtn, { backgroundColor: isRunning ? '#e67e22' : '#2ecc71' }]} 
-          onPress={() => setIsRunning(!isRunning)}>
-          <Text style={styles.timerBtnText}>{isRunning ? 'Pause' : 'Start'}</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.timerBtn, { backgroundColor: '#3498db' }]} 
+          style={[
+            styles.button,
+            !isHalfTimeEnabled && styles.disabledButton,
+          ]}
+          disabled={!isHalfTimeEnabled}
           onPress={() => {
-            setIsRunning(false);
-            setTimer(Number(matchTime || 0) * 60);
-          }}>
-          <Text style={styles.timerBtnText}>Reset</Text>
+            // Half-time logic will be added later
+            alert('Half Time clicked');
+          }}
+        >
+          <Text style={styles.buttonText}>Half Time</Text>
         </TouchableOpacity>
+
+<View style={styles.row}>
+  <TouchableOpacity
+    style={styles.buttonInline}
+    onPress={() => {
+      setIsRunning(false);
+      setTimeoutSeconds(30);
+    }}
+  >
+    <Text style={styles.buttonText}>Timeout</Text>
+  </TouchableOpacity>
+
+  {timeoutSeconds > 0 && (
+    <Text style={styles.timeoutText}>⏳ {timeoutSeconds}s</Text>
+  )}
+</View>
+
       </View>
     </View>
   );
@@ -153,90 +127,83 @@ export default function ScoreScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#222',
-    padding: 10,
-  },
-  timerText: {
-    fontSize: 36,
-    textAlign: 'center',
-    color: 'white',
-    marginVertical: 10,
-  },
-  scoreWrap: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 10,
+    height: '20%',
+    width: '100%',
+    backgroundColor: '#f5f5f5',
+    borderBottomColor: '#ccc',
+    borderBottomWidth: 1,
   },
-  teamScoreWrap: {
+  teamSection: {
+    width: '40%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  teamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  scoreRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   teamName: {
-    fontSize: 20,
-    color: '#f39c12',
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    marginHorizontal: 10,
   },
   score: {
-    fontSize: 28,
-    color: 'white',
-  },
-  playersWrap: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 20,
-  },
-  teamPlayers: {
-    width: '48%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  playerBox: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 5,
-    margin: 4,
-    width: '40%',
-    alignItems: 'center',
-  },
-  playerIn: {
-    borderColor: 'green',
-    backgroundColor: '#1abc9c',
-  },
-  playerOut: {
-    borderColor: 'red',
-    backgroundColor: '#c0392b',
-  },
-  playerText: {
-    color: 'white',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 8,
-  },
-  actionBtn: {
-    alignItems: 'center',
-    backgroundColor: '#34495e',
-    padding: 10,
-    borderRadius: 10,
-    width: '22%',
-  },
-  actionText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  timerBtn: {
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  timerBtnText: {
-    color: 'white',
+    fontSize: 22,
     fontWeight: 'bold',
-    fontSize: 16,
+    marginHorizontal: 20,
   },
+  vs: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  timerSection: {
+    width: '60%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mainTimer: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  button: {
+    backgroundColor: '#1976d2',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginVertical: 2,
+  },
+  disabledButton: {
+    backgroundColor: '#aaa',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  timeoutText: {
+    fontSize: 16,
+    color: 'red',
+    marginTop: 6,
+  },
+  row: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 6,
+  gap: 10,
+},
+buttonInline: {
+  backgroundColor: '#1976d2',
+  paddingHorizontal: 14,
+  paddingVertical: 6,
+  borderRadius: 6,
+  marginLeft: 10,
+},
+
 });
