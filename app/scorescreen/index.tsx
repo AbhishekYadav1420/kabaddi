@@ -1,4 +1,4 @@
-// /app/scorescreen.tsx
+// app/scorescreen.tsx
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,376 +12,401 @@ import {
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 
-const ScoreScreen = () => {
+type PlayerStatus = { name: string; out: boolean };
+
+export default function ScoreScreen() {
   const {
     team1,
     team2,
     playersTeam1,
     playersTeam2,
+    toss,
     time,
-    bonusAllowed,
-    superTackleAllowed,
-  } = useLocalSearchParams();
+  } = useLocalSearchParams<{
+    team1: string;
+    team2: string;
+    playersTeam1: string;
+    playersTeam2: string;
+    toss: string;
+    time: string;
+  }>();
 
-  const [team1Name, setTeam1Name] = useState('');
-  const [team2Name, setTeam2Name] = useState('');
-  const [team1Players, setTeam1Players] = useState<string[]>([]);
-  const [team2Players, setTeam2Players] = useState<string[]>([]);
-  const [matchTime, setMatchTime] = useState(0); // seconds
-  const [bonus, setBonus] = useState(true);
-  const [superTackle, setSuperTackle] = useState(true);
+  const team1Name = team1 || 'Team 1';
+  const team2Name = team2 || 'Team 2';
+  const matchTime = parseInt(time || '600');
 
-  const [timer, setTimer] = useState<number>(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const initialTeam1Players: PlayerStatus[] = JSON.parse(playersTeam1 || '[]').map((name: string) => ({ name, out: false }));
+  const initialTeam2Players: PlayerStatus[] = JSON.parse(playersTeam2 || '[]').map((name: string) => ({ name, out: false }));
 
-  const [timeoutActive, setTimeoutActive] = useState(false);
-  const [timeoutTimer, setTimeoutTimer] = useState(30);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [team1Players, setTeam1Players] = useState<PlayerStatus[]>(initialTeam1Players);
+  const [team2Players, setTeam2Players] = useState<PlayerStatus[]>(initialTeam2Players);
 
-  const [raidTimer, setRaidTimer] = useState(30);
-  const [isRaidRunning, setIsRaidRunning] = useState(false);
-  const raidRef = useRef<NodeJS.Timeout | null>(null);
+  const [team1Score, setTeam1Score] = useState(0);
+  const [team2Score, setTeam2Score] = useState(0);
 
-  const [score1, setScore1] = useState(0);
-  const [score2, setScore2] = useState(0);
-  const [undoStack, setUndoStack] = useState<{ t1: number; t2: number }[]>([]);
+  const [matchTimer, setMatchTimer] = useState(matchTime);
+  const [matchRunning, setMatchRunning] = useState(false);
+  const matchInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const [alive1, setAlive1] = useState<boolean[]>(Array(7).fill(true));
-  const [alive2, setAlive2] = useState<boolean[]>(Array(7).fill(true));
+  const [team1RaidTimer, setTeam1RaidTimer] = useState(30);
+  const [team1RaidRunning, setTeam1RaidRunning] = useState(false);
+  const team1RaidInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const [raider1, setRaider1] = useState<string | null>(null);
-  const [raider2, setRaider2] = useState<string | null>(null);
-  const [defender1, setDefender1] = useState<string | null>(null);
-  const [defender2, setDefender2] = useState<string | null>(null);
+  const [team2RaidTimer, setTeam2RaidTimer] = useState(30);
+  const [team2RaidRunning, setTeam2RaidRunning] = useState(false);
+  const team2RaidInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const [openRaider1, setOpenRaider1] = useState(false);
-  const [openRaider2, setOpenRaider2] = useState(false);
-  const [openDefender1, setOpenDefender1] = useState(false);
-  const [openDefender2, setOpenDefender2] = useState(false);
+  const [team1DropdownOpen, setTeam1DropdownOpen] = useState(false);
+  const [team1DropdownValue, setTeam1DropdownValue] = useState(null);
+  const [team1DropdownItems, setTeam1DropdownItems] = useState<any[]>([]);
 
+  const [team2DropdownOpen, setTeam2DropdownOpen] = useState(false);
+  const [team2DropdownValue, setTeam2DropdownValue] = useState(null);
+  const [team2DropdownItems, setTeam2DropdownItems] = useState<any[]>([]);
+
+  // Match Timer Effect
   useEffect(() => {
-    if (team1) setTeam1Name(team1 as string);
-    if (team2) setTeam2Name(team2 as string);
-    if (playersTeam1) setTeam1Players(JSON.parse(playersTeam1 as string));
-    if (playersTeam2) setTeam2Players(JSON.parse(playersTeam2 as string));
-    if (time) setMatchTime(parseInt((time as string).split(':')[0]) * 60);
-    if (bonusAllowed) setBonus(bonusAllowed === 'true');
-    if (superTackleAllowed) setSuperTackle(superTackleAllowed === 'true');
-    setTimer(parseInt((time as string).split(':')[0]) * 60);
-  }, []);
-
-  useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current!);
+    if (matchRunning) {
+      matchInterval.current = setInterval(() => {
+        setMatchTimer((prev) => {
+          if (prev === 1) {
+            setMatchRunning(false);
+            clearInterval(matchInterval.current!);
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (matchInterval.current) clearInterval(matchInterval.current);
     }
-    return () => clearInterval(intervalRef.current!);
-  }, [isRunning]);
+    return () => {
+      if (matchInterval.current) clearInterval(matchInterval.current);
+    };
+  }, [matchRunning]);
 
+  // Raid Timer Effects
   useEffect(() => {
-    if (timeoutActive) {
-      timeoutRef.current = setInterval(() => {
-        setTimeoutTimer(prev => {
-          if (prev <= 1) {
-            setTimeoutActive(false);
-            clearInterval(timeoutRef.current!);
+    if (team1RaidRunning) {
+      team1RaidInterval.current = setInterval(() => {
+        setTeam1RaidTimer((prev) => {
+          if (prev === 1) {
+            setTeam1RaidRunning(false);
+            clearInterval(team1RaidInterval.current!);
+            setTeam1RaidTimer(30);
             return 30;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (timeoutRef.current) clearInterval(timeoutRef.current);
+      if (team1RaidInterval.current) clearInterval(team1RaidInterval.current);
     }
-    return () => clearInterval(timeoutRef.current!);
-  }, [timeoutActive]);
+    return () => {
+      if (team1RaidInterval.current) clearInterval(team1RaidInterval.current);
+    };
+  }, [team1RaidRunning]);
 
   useEffect(() => {
-    if (isRaidRunning) {
-      raidRef.current = setInterval(() => {
-        setRaidTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(raidRef.current!);
-            setIsRaidRunning(false);
-            setRaidTimer(30);
+    if (team2RaidRunning) {
+      team2RaidInterval.current = setInterval(() => {
+        setTeam2RaidTimer((prev) => {
+          if (prev === 1) {
+            setTeam2RaidRunning(false);
+            clearInterval(team2RaidInterval.current!);
+            setTeam2RaidTimer(30);
             return 30;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (raidRef.current) clearInterval(raidRef.current);
+      if (team2RaidInterval.current) clearInterval(team2RaidInterval.current);
     }
-    return () => clearInterval(raidRef.current!);
-  }, [isRaidRunning]);
+    return () => {
+      if (team2RaidInterval.current) clearInterval(team2RaidInterval.current);
+    };
+  }, [team2RaidRunning]);
 
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  // Update dropdowns dynamically
+  useEffect(() => {
+    setTeam1DropdownItems(team1Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
+    setTeam2DropdownItems(team2Players.filter(p => !p.out).map(p => ({ label: p.name, value: p.name })));
+  }, [team1Players, team2Players]);
 
-  const handleScore = (points: number, team: 1 | 2, type: 'tackle' | 'bonus' | 'normal') => {
-    setUndoStack(prev => [...prev, { t1: score1, t2: score2 }]);
-    if (team === 1) {
-      if (type === 'tackle' && superTackle && alive2.filter(a => a).length <= 3) {
-        setScore1(score1 + 2);
-      } else {
-        setScore1(score1 + points);
-      }
-    } else {
-      if (type === 'tackle' && superTackle && alive1.filter(a => a).length <= 3) {
-        setScore2(score2 + 2);
-      } else {
-        setScore2(score2 + points);
-      }
-    }
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
   };
 
   const handleOut = (team: 1 | 2, index: number) => {
     if (team === 1) {
-      const newAlive = [...alive1];
-      newAlive[index] = false;
-      setAlive1(newAlive);
-      revivePlayer(2);
-    } else {
-      const newAlive = [...alive2];
-      newAlive[index] = false;
-      setAlive2(newAlive);
-      revivePlayer(1);
-    }
-  };
+      const updated = [...team1Players];
+      updated[index].out = true;
+      setTeam1Players(updated);
 
-  const revivePlayer = (team: 1 | 2) => {
-    if (team === 1) {
-      const idx = alive1.findIndex(a => a === false);
-      if (idx !== -1) {
-        const newAlive = [...alive1];
-        newAlive[idx] = true;
-        setAlive1(newAlive);
+      // revive opponent
+      const revive = [...team2Players];
+      const outIndex = revive.findIndex(p => p.out);
+      if (outIndex !== -1) {
+        revive[outIndex].out = false;
+        setTeam2Players(revive);
+      }
+
+      // check for all-out
+      if (updated.every(p => p.out)) {
+        const revived = updated.map(p => ({ ...p, out: false }));
+        setTeam1Players(revived);
+        setTeam2Score(prev => prev + 2);
       }
     } else {
-      const idx = alive2.findIndex(a => a === false);
-      if (idx !== -1) {
-        const newAlive = [...alive2];
-        newAlive[idx] = true;
-        setAlive2(newAlive);
+      const updated = [...team2Players];
+      updated[index].out = true;
+      setTeam2Players(updated);
+
+      // revive opponent
+      const revive = [...team1Players];
+      const outIndex = revive.findIndex(p => p.out);
+      if (outIndex !== -1) {
+        revive[outIndex].out = false;
+        setTeam1Players(revive);
+      }
+
+      // check for all-out
+      if (updated.every(p => p.out)) {
+        const revived = updated.map(p => ({ ...p, out: false }));
+        setTeam2Players(revived);
+        setTeam1Score(prev => prev + 2);
       }
     }
   };
 
-  const handleUndo = () => {
-    const last = undoStack.pop();
-    if (last) {
-      setScore1(last.t1);
-      setScore2(last.t2);
-    }
-  };
-
-  const renderDots = (alive: boolean[]) =>
-    alive.map((a, i) => (
-      <FontAwesome
-        key={i}
-        name="circle"
-        size={16}
-        color={a ? 'green' : 'gray'}
-        style={{ marginHorizontal: 2 }}
-      />
-    ));
-
-  const getDropdownItems = (players: string[]) => players.map(p => ({ label: p, value: p }));
-
-  const renderTeamSection = (
-    teamName: string,
-    players: string[],
-    alive: boolean[],
-    raider: string | null,
-    defenderItems: string[],
-    openRaider: boolean,
-    openDefender: boolean,
-    setRaider: React.Dispatch<React.SetStateAction<string | null>>,
-    setOpenRaider: (v: boolean) => void,
-    setOpenDefender: (v: boolean) => void,
-    setDefender: React.Dispatch<React.SetStateAction<string | null>>,
-    teamNum: 1 | 2
-  ) => (
-    <View style={styles.teamBlock}>
-      <Text style={styles.teamTitle}>{teamName}</Text>
-      <View style={styles.dotsRow}>{renderDots(alive)}</View>
-      <View style={styles.raidTimerRow}>
-        <Text style={{ fontWeight: 'bold' }}>Raid Timer: {raidTimer}s</Text>
-        <TouchableOpacity style={styles.button} onPress={() => setIsRaidRunning(prev => !prev)}>
-          <Text style={styles.buttonText}>{isRaidRunning ? 'Pause' : 'Start'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <DropDownPicker
-        open={openRaider}
-        value={raider}
-        items={getDropdownItems(players)}
-        setOpen={setOpenRaider}
-        setValue={setRaider}
-        placeholder="Select Raider"
-        style={{ marginBottom: 10 }}
-      />
-
-      <DropDownPicker
-        open={openDefender}
-        value={teamNum === 1 ? defender2 : defender1}
-        items={getDropdownItems(defenderItems)}
-        setOpen={setOpenDefender}
-        setValue={setDefender}
-        placeholder="Select Defender"
-        style={{ marginBottom: 10 }}
-      />
-
-      <View style={styles.scoreRow}>
-        <TouchableOpacity style={styles.button} onPress={() => bonus && handleScore(1, teamNum, 'bonus')}>
-          <Text style={styles.buttonText}>Bonus</Text>
-        </TouchableOpacity>
-        {[1, 2, 3].map(n => (
-          <TouchableOpacity key={n} style={styles.button} onPress={() => handleScore(n, teamNum, 'normal')}>
-            <Text style={styles.buttonText}>{n}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.scoreRow}>
-        <TouchableOpacity style={styles.button} onPress={() => handleScore(1, teamNum, 'tackle')}>
-          <Text style={styles.buttonText}>Tackle</Text>
-        </TouchableOpacity>
-        {[4, 5, 6].map(n => (
-          <TouchableOpacity key={n} style={styles.button} onPress={() => handleScore(n, teamNum, 'normal')}>
-            <Text style={styles.buttonText}>{n}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.scoreRow}>
-        <TouchableOpacity style={styles.button} onPress={handleUndo}>
-          <Text style={styles.buttonText}>Undo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => handleScore(7, teamNum, 'normal')}>
-          <Text style={styles.buttonText}>7</Text>
-        </TouchableOpacity>
-      </View>
-
-      {players.map((p, i) => (
-        alive[i] && (
-          <View key={i} style={styles.playerRow}>
-            <Text>{p}</Text>
-            <TouchableOpacity onPress={() => handleOut(teamNum, i)}>
-              <Text style={{ color: 'red' }}>Out</Text>
-            </TouchableOpacity>
-          </View>
-        )
+  const renderDots = (players: PlayerStatus[]) => (
+    <View style={{ flexDirection: 'row', marginVertical: 4 }}>
+      {players.map((p, idx) => (
+        <FontAwesome
+          key={idx}
+          name="circle"
+          size={14}
+          color={p.out ? 'gray' : 'green'}
+          style={{ marginRight: 4 }}
+        />
       ))}
     </View>
   );
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Section 1 - Top */}
-      <View style={styles.header}>
-        <Text style={styles.title}>{team1Name} vs {team2Name}</Text>
-        <Text style={styles.score}>{score1} - {score2}</Text>
-        <Text style={styles.timer}>{formatTime(timer)}</Text>
+  const renderTeamSection = (
+    teamNum: 1 | 2,
+    teamName: string,
+    players: PlayerStatus[],
+    setPlayers: React.Dispatch<React.SetStateAction<PlayerStatus[]>>,
+    score: number,
+    setScore: React.Dispatch<React.SetStateAction<number>>,
+    raidTimer: number,
+    raidRunning: boolean,
+    setRaidRunning: React.Dispatch<React.SetStateAction<boolean>>,
+    dropdownOpen: boolean,
+    setDropdownOpen: (val: boolean) => void,
+    dropdownValue: any,
+    setDropdownValue: any,
+    dropdownItems: any[],
+    setDropdownItems: any[],
+    opponentPlayers: PlayerStatus[],
+  ) => {
+    const handleScore = (pts: number) => setScore(prev => prev + pts);
 
-        <View style={styles.controls}>
-          <TouchableOpacity style={styles.button} onPress={() => setIsRunning(prev => !prev)}>
-            <Text style={styles.buttonText}>{isRunning ? 'Pause' : 'Start'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => timer === 0 && Alert.alert('Half Time!')}
-            disabled={timer !== 0}
-          >
-            <Text style={styles.buttonText}>Half Time</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => setTimeoutActive(true)}>
-            <Text style={styles.buttonText}>Timeout ({timeoutTimer}s)</Text>
+    const handleTackle = () => {
+      const defenders = opponentPlayers.filter(p => !p.out).length;
+      if (defenders <= 3) {
+        handleScore(2); // super tackle
+      } else {
+        handleScore(1);
+      }
+    };
+
+    return (
+      <View style={styles.teamSection}>
+        <View style={styles.teamHeader}>
+          <Text style={styles.teamTitle}>{teamName}</Text>
+          {renderDots(players)}
+          <Text style={styles.timerText}>{raidTimer}s</Text>
+          <TouchableOpacity onPress={() => setRaidRunning(prev => !prev)} style={styles.btn}>
+            <Text style={styles.btnText}>{raidRunning ? 'End' : 'Start'}</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.cardRow}>
+          <View style={styles.card}>
+            {players.map((p, idx) => !p.out && (
+              <View key={idx} style={styles.playerRow}>
+                <Text style={{ flex: 1 }}>{p.name}</Text>
+                <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
+                  <Text style={styles.outBtn}>Out</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.card}>
+            <DropDownPicker
+              open={dropdownOpen}
+              value={dropdownValue}
+              items={dropdownItems}
+              setOpen={setDropdownOpen}
+              setValue={setDropdownValue}
+              setItems={setDropdownItems}
+              placeholder={raidRunning ? 'Select Raider' : 'Select Defender'}
+              containerStyle={{ marginBottom: 10 }}
+            />
+
+            <View style={styles.scoreBtnGroup}>
+              {['Bonus', '1', '2', '3', '4', '5', '6', '7'].map(label => (
+                <TouchableOpacity key={label} onPress={() => handleScore(label === 'Bonus' ? 1 : parseInt(label))} style={styles.scoreBtn}>
+                  <Text style={styles.scoreBtnText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={handleTackle} style={styles.scoreBtn}>
+                <Text style={styles.scoreBtnText}>Tackle</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setScore(prev => Math.max(prev - 1, 0))} style={styles.scoreBtn}>
+                <Text style={styles.scoreBtnText}>Undo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      {/* Section 1 */}
+      <View style={styles.section1}>
+        <Text style={styles.title}>{team1Name} - {team1Score} | {team2Score} - {team2Name}</Text>
+        <Text style={styles.timer}>{formatTime(matchTimer)}</Text>
+        <TouchableOpacity onPress={() => setMatchRunning(prev => !prev)} style={styles.controlBtn}>
+          <Text style={styles.controlBtnText}>{matchRunning ? 'Pause' : 'Start'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity disabled={matchTimer > 0} onPress={() => Alert.alert('Half Time')} style={styles.controlBtn}>
+          <Text style={styles.controlBtnText}>Half Time</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => Alert.alert('Timeout', '30 sec timeout')} style={styles.controlBtn}>
+          <Text style={styles.controlBtnText}>Timeout</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Section 2 - Team 1 */}
+      {/* Section 2 */}
       {renderTeamSection(
+        1,
         team1Name,
         team1Players,
-        alive1,
-        raider1,
-        team2Players,
-        openRaider1,
-        openDefender2,
-        setRaider1,
-        setOpenRaider1,
-        setOpenDefender2,
-        setDefender2,
-        1
+        setTeam1Players,
+        team1Score,
+        setTeam1Score,
+        team1RaidTimer,
+        team1RaidRunning,
+        setTeam1RaidRunning,
+        team1DropdownOpen,
+        setTeam1DropdownOpen,
+        team1DropdownValue,
+        setTeam1DropdownValue,
+        team1DropdownItems,
+        setTeam1DropdownItems,
+        team2Players
       )}
 
-      {/* Section 3 - Team 2 */}
+      {/* Section 3 */}
       {renderTeamSection(
+        2,
         team2Name,
         team2Players,
-        alive2,
-        raider2,
-        team1Players,
-        openRaider2,
-        openDefender1,
-        setRaider2,
-        setOpenRaider2,
-        setOpenDefender1,
-        setDefender1,
-        2
+        setTeam2Players,
+        team2Score,
+        setTeam2Score,
+        team2RaidTimer,
+        team2RaidRunning,
+        setTeam2RaidRunning,
+        team2DropdownOpen,
+        setTeam2DropdownOpen,
+        team2DropdownValue,
+        setTeam2DropdownValue,
+        team2DropdownItems,
+        setTeam2DropdownItems,
+        team1Players
       )}
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: { padding: 10 },
-  header: { alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 20, fontWeight: 'bold' },
-  score: { fontSize: 36, fontWeight: 'bold' },
-  timer: { fontSize: 18, marginVertical: 10 },
-  controls: { flexDirection: 'row', gap: 10 },
-  teamBlock: { marginVertical: 15 },
-  teamTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
-  dotsRow: { flexDirection: 'row', marginBottom: 10 },
-  raidTimerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  section1: { alignItems: 'center', marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
+  timer: { fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
+  controlBtn: {
+    backgroundColor: '#2196F3',
+    padding: 10,
+    marginVertical: 4,
+    borderRadius: 8,
+    width: '60%',
     alignItems: 'center',
-    marginBottom: 10,
   },
-  scoreRow: {
+  controlBtnText: { color: '#fff', fontWeight: 'bold' },
+
+  teamSection: {
+    marginBottom: 16,
+    padding: 10,
+    backgroundColor: '#eee',
+    borderRadius: 12,
+  },
+  teamHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  button: {
-    backgroundColor: '#1e90ff',
-    padding: 8,
+  teamTitle: { fontSize: 18, fontWeight: 'bold', flex: 1 },
+  timerText: { fontSize: 16, marginHorizontal: 6 },
+  btn: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
   },
-  buttonText: { color: '#fff' },
+  btnText: { color: 'white', fontWeight: 'bold' },
+
+  cardRow: { flexDirection: 'row', gap: 10 },
+  card: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 10,
+  },
   playerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  outBtn: {
+    color: 'red',
+    fontWeight: 'bold',
+  },
+  scoreBtnGroup: {
+    flexWrap: 'wrap',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+  },
+  scoreBtn: {
+    backgroundColor: '#FF9800',
+    padding: 8,
+    borderRadius: 6,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  scoreBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });
-
-export default ScoreScreen;
