@@ -249,14 +249,19 @@ export default function ScoreScreen() {
   ) => {
     const handleScore = (pts: number) => {
       let finalPoints = pts;
-      if (
-        (teamNum === 1 && team1FoulChecked) ||
-        (teamNum === 2 && team2FoulChecked)
-      ) {
-        finalPoints += 1; // Foul point
-        if (teamNum === 1) setTeam1FoulChecked(false);
-        else setTeam2FoulChecked(false);
-      }
+const handleScore = (pts: number) => {
+  setScore((prev) => prev + pts);
+
+  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+  const setActionStack =
+    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+  setActionStack([...actionStack, { type: "score", value: pts }]);
+
+  // Reset empty raid count since score is given
+  if (teamNum === 1) setTeam1EmptyRaidCount(0);
+  else setTeam2EmptyRaidCount(0);
+};
+
 
       setScore((prev) => prev + finalPoints);
 
@@ -365,69 +370,63 @@ export default function ScoreScreen() {
           {renderDots(players)}
           <Text style={styles.timerText}>{raidTimer}s</Text>
           <TouchableOpacity
-            onPress={() => {
-              const newState = !raidRunning;
-              setRaidRunning(newState);
+         onPress={() => {
+  const newState = !raidRunning;
 
-              // Clear raid actions on start
-              const setActions =
-                teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-              setActions([]);
+  // 🟢 Only clear raid actions when NEW raid is starting
+  if (newState) {
+    const setActions =
+      teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+    setActions([]);
+  }
 
-              // Reset dropdown selection when raid ends
-              if (!newState) {
-                const actions =
-                  teamNum === 1 ? team1RaidActions : team2RaidActions;
-                const dropdownVal =
-                  teamNum === 1 ? team1DropdownValue : team2DropdownValue;
-                const playersList =
-                  teamNum === 1 ? [...team1Players] : [...team2Players];
-                const setPlayersList =
-                  teamNum === 1 ? setTeam1Players : setTeam2Players;
+  setRaidRunning(newState);
 
-                if (dropdownVal && actions.length === 0) {
-                  // No scoring = Empty raid
-                  if (teamNum === 1) {
-                    setTeam1EmptyRaidCount((prev) => {
-                      if (prev === 2) {
-                        // 3rd empty raid = Do-or-Die = auto out raider
-                        const idx = playersList.findIndex(
-                          (p) => p.name === dropdownVal
-                        );
-                        if (idx !== -1) {
-                          playersList[idx].out = true;
-                          setTeam1Players(playersList);
-                        }
-                        return 0;
-                      }
-                      return prev + 1;
-                    });
-                  } else {
-                    setTeam2EmptyRaidCount((prev) => {
-                      if (prev === 2) {
-                        const idx = playersList.findIndex(
-                          (p) => p.name === dropdownVal
-                        );
-                        if (idx !== -1) {
-                          playersList[idx].out = true;
-                          setTeam2Players(playersList);
-                        }
-                        return 0;
-                      }
-                      return prev + 1;
-                    });
-                  }
-                } else {
-                  // If not empty, reset empty raid
-                  if (teamNum === 1) setTeam1EmptyRaidCount(0);
-                  else setTeam2EmptyRaidCount(0);
-                }
+  // Reset dropdown selection when raid ends
+  if (!newState) {
+    const actions = teamNum === 1 ? team1RaidActions : team2RaidActions;
+    const dropdownVal = teamNum === 1 ? team1DropdownValue : team2DropdownValue;
+    const playersList = teamNum === 1 ? [...team1Players] : [...team2Players];
+    const setPlayersList = teamNum === 1 ? setTeam1Players : setTeam2Players;
 
-                (teamNum === 1 ? setTeam1DropdownValue : setTeam2DropdownValue)(
-                  null
-                );
-              }
-            }}
+    if (dropdownVal && actions.length === 0) {
+      if (teamNum === 1) {
+        setTeam1EmptyRaidCount((prev) => {
+          if (prev === 2) {
+            const idx = playersList.findIndex((p) => p.name === dropdownVal);
+            if (idx !== -1) {
+              playersList[idx].out = true;
+              setTeam1Players(playersList);
+            }
+            return 0;
+          }
+          return prev + 1;
+        });
+      } else {
+        setTeam2EmptyRaidCount((prev) => {
+          if (prev === 2) {
+            const idx = playersList.findIndex((p) => p.name === dropdownVal);
+            if (idx !== -1) {
+              playersList[idx].out = true;
+              setTeam2Players(playersList);
+            }
+            return 0;
+          }
+          return prev + 1;
+        });
+      }
+    } else {
+      // reset empty raid
+      setTeam1EmptyRaidCount(0);
+      setTeam2EmptyRaidCount(0);
+    }
+
+    // ✅ Reset BOTH dropdowns when any raid ends
+    setTeam1DropdownValue(null);
+    setTeam2DropdownValue(null);
+  }
+}}
+
             style={styles.btn}
           >
             <Text style={styles.btnText}>{raidRunning ? "End" : "Start"}</Text>
@@ -468,11 +467,18 @@ export default function ScoreScreen() {
               }}
             >
               <TouchableOpacity
-                onPress={() =>
-                  teamNum === 1
-                    ? setTeam1FoulChecked((prev) => !prev)
-                    : setTeam2FoulChecked((prev) => !prev)
-                }
+onPress={() => {
+  if (teamNum === 1) {
+    setTeam1Score((prev) => prev + 1);
+    setTeam1FoulChecked(false);
+    setTeam1RaidActions((prev) => [...prev, { type: "score", value: 1 }]);
+  } else {
+    setTeam2Score((prev) => prev + 1);
+    setTeam2FoulChecked(false);
+    setTeam2RaidActions((prev) => [...prev, { type: "score", value: 1 }]);
+  }
+}}
+
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
