@@ -107,7 +107,11 @@ export default function ScoreScreen() {
 
   const [doOrDieTeam, setDoOrDieTeam] = useState<1 | 2 | null>(null);
   const [showDropdownWarning, setShowDropdownWarning] = useState(false);
-const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
+  const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
+
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+const scrollOffsetY = useRef(0);
+
 
   useEffect(() => {
     if (matchRunning) {
@@ -223,6 +227,25 @@ const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
     setGamePhase("ended");
     setMatchRunning(false);
   };
+
+  const StickyScoreHeader = ({
+    team1Name,
+    team2Name,
+    team1Score,
+    team2Score,
+  }: {
+    team1Name: string;
+    team2Name: string;
+    team1Score: number;
+    team2Score: number;
+  }) => (
+    <View style={styles.stickyHeader}>
+      <Text style={styles.stickyText}>
+        {team1Name} {team1Score.toString().padStart(2, "0")} :{" "}
+        {team2Score.toString().padStart(2, "0")} {team2Name}
+      </Text>
+    </View>
+  );
 
   const handleOut = (team: 1 | 2, index: number) => {
     const current = team === 1 ? [...team1Players] : [...team2Players];
@@ -528,42 +551,42 @@ const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
           </View>
 
           <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
-       <DropDownPicker
-  open={dropdownOpen}
-  value={dropdownValue}
-  items={dropdownItems}
-  setOpen={setDropdownOpen}
-  setValue={(val) => {
-    setDropdownValue(val);
-    setShowDropdownWarning(false);
-  }}
-  setItems={setDropdownItems}
-  placeholder={
-    raidRunning
-      ? showDropdownWarning && !dropdownValue
-        ? "! Select Raider"
-        : "Select Raider"
-      : showDropdownWarning && !dropdownValue
-      ? "! Select Defender"
-      : "Select Defender"
-  }
-  placeholderStyle={{
-    color: showDropdownWarning && !dropdownValue ? "red" : "#000",
-    fontWeight: showDropdownWarning && !dropdownValue ? "bold" : "normal",
-  }}
-  containerStyle={{ marginBottom: 10 }}
-  style={{
-    borderColor:
-      showDropdownWarning && !dropdownValue ? "red" : "#ccc",
-    borderWidth: 1,
-    opacity: disableDropdowns ? 0.5 : 1, // 👈 lowered opacity
-  }}
-  dropDownContainerStyle={{
-    opacity: disableDropdowns ? 0.5 : 1,
-  }}
-  disabled={disableDropdowns} // 👈 disables selection
-/>
-
+            <DropDownPicker
+              open={dropdownOpen}
+              value={dropdownValue}
+              items={dropdownItems}
+              setOpen={setDropdownOpen}
+              setValue={(val) => {
+                setDropdownValue(val);
+                setShowDropdownWarning(false);
+              }}
+              setItems={setDropdownItems}
+              placeholder={
+                raidRunning
+                  ? showDropdownWarning && !dropdownValue
+                    ? "! Select Raider"
+                    : "Select Raider"
+                  : showDropdownWarning && !dropdownValue
+                  ? "! Select Defender"
+                  : "Select Defender"
+              }
+              placeholderStyle={{
+                color: showDropdownWarning && !dropdownValue ? "red" : "#000",
+                fontWeight:
+                  showDropdownWarning && !dropdownValue ? "bold" : "normal",
+              }}
+              containerStyle={{ marginBottom: 10 }}
+              style={{
+                borderColor:
+                  showDropdownWarning && !dropdownValue ? "red" : "#ccc",
+                borderWidth: 1,
+                opacity: disableDropdowns ? 0.5 : 1, // 👈 lowered opacity
+              }}
+              dropDownContainerStyle={{
+                opacity: disableDropdowns ? 0.5 : 1,
+              }}
+              disabled={disableDropdowns} // 👈 disables selection
+            />
 
             <View
               style={{
@@ -712,193 +735,223 @@ const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
     );
   };
 
-const renderDots = (players: PlayerStatus[]) => {
-  const totalOut = players.filter((p) => p.out).length;
-  const totalPlayers = players.length;
+  const renderDots = (players: PlayerStatus[]) => {
+    const totalOut = players.filter((p) => p.out).length;
+    const totalPlayers = players.length;
+
+    return (
+      <View style={{ flexDirection: "row", marginVertical: 4 }}>
+        {Array.from({ length: totalPlayers }).map((_, idx) => (
+          <FontAwesome
+            key={idx}
+            name="circle"
+            size={14}
+            color={idx < totalOut ? "gray" : "green"}
+            style={{ marginRight: 4 }}
+          />
+        ))}
+      </View>
+    );
+  };
 
   return (
-    <View style={{ flexDirection: "row", marginVertical: 4 }}>
-      {Array.from({ length: totalPlayers }).map((_, idx) => (
-        <FontAwesome
-          key={idx}
-          name="circle"
-          size={14}
-          color={idx < totalOut ? "gray" : "green"}
-          style={{ marginRight: 4 }}
-        />
-      ))}
-    </View>
-  );
-};
+    <View style={{ flex: 1 }}>
+    {showStickyHeader && (
+  <StickyScoreHeader
+    team1Name={team1Name}
+    team2Name={team2Name}
+    team1Score={team1Score}
+    team2Score={team2Score}
+  />
+)}
 
+     <ScrollView
+  contentContainerStyle={styles.container}
+  scrollEventThrottle={16}
+  onScroll={(event) => {
+    const currentOffset = event.nativeEvent.contentOffset.y;
+    const direction = currentOffset < scrollOffsetY.current ? 'up' : 'down';
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
-          {/* Toss and Choice Row */}
-          <View style={{ marginBottom: 6 }}>
-            <Text style={styles.tossRow}>
-              Toss: {selectedTossWinner === "team1" ? team1Name : team2Name} |
-              Choice: {choice}
+    if (direction === 'down' && currentOffset > 50) {
+      setShowStickyHeader(true);
+    } else {
+      setShowStickyHeader(false);
+    }
+
+    scrollOffsetY.current = currentOffset;
+  }}
+>
+
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
+            {/* Toss and Choice Row */}
+            <View style={{ marginBottom: 6 }}>
+              <Text style={styles.tossRow}>
+                Toss: {selectedTossWinner === "team1" ? team1Name : team2Name} |
+                Choice: {choice}
+              </Text>
+            </View>
+
+            {/* Team Names Row */}
+            <Text style={styles.teamNames}>
+              {team1Name} | {team2Name}
+            </Text>
+
+            {/* Score Row */}
+            <Text style={styles.scoreRow}>
+              {team1Score.toString().padStart(2, "0")} :{" "}
+              {team2Score.toString().padStart(2, "0")}
             </Text>
           </View>
 
-          {/* Team Names Row */}
-          <Text style={styles.teamNames}>
-            {team1Name} | {team2Name}
-          </Text>
+          <View
+            style={[
+              styles.card,
+              { flex: 1, marginLeft: 5, alignItems: "center" },
+            ]}
+          >
+            {gamePhase !== "ended" ? (
+              <>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      fontWeight: "bold",
+                      marginBottom: 6,
+                    }}
+                  >
+                    {formatTime(matchTimer)}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.controlBtn, { backgroundColor: "#2196F3" }]}
+                    onPress={() => setMatchRunning((prev) => !prev)}
+                    disabled={gamePhase === "halftime"}
+                  >
+                    <Text style={styles.controlBtnText}>
+                      {matchRunning ? "Pause" : "Start"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-          {/* Score Row */}
-          <Text style={styles.scoreRow}>
-            {team1Score.toString().padStart(2, "0")} :{" "}
-            {team2Score.toString().padStart(2, "0")}
-          </Text>
+                {gamePhase === "first" && (
+                  <TouchableOpacity
+                    style={[
+                      styles.controlBtn,
+                      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" }, // grey when disabled, green when enabled
+                    ]}
+                    disabled={matchTimer > 0}
+                    onPress={handleHalfTimePress}
+                  >
+                    <Text style={styles.controlBtnText}>Half Time</Text>
+                  </TouchableOpacity>
+                )}
+
+                {gamePhase === "halftime" && (
+                  <TouchableOpacity
+                    style={styles.controlBtn}
+                    onPress={handleHalftimeEnd}
+                  >
+                    <Text style={styles.controlBtnText}>Halftime End</Text>
+                  </TouchableOpacity>
+                )}
+
+                {gamePhase === "second" && (
+                  <TouchableOpacity
+                    style={[
+                      styles.controlBtn,
+                      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" },
+                    ]}
+                    disabled={matchTimer > 0}
+                    onPress={handleFullTime}
+                  >
+                    <Text style={styles.controlBtnText}>Full Time</Text>
+                  </TouchableOpacity>
+                )}
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 10,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => setTimeoutRunning(true)}
+                    style={[styles.controlBtn, { paddingHorizontal: 16 }]}
+                  >
+                    <Text style={styles.controlBtnText}>Timeout</Text>
+                  </TouchableOpacity>
+                  {timeoutRunning && (
+                    <Text style={{ marginLeft: 10, fontSize: 16 }}>
+                      {timeoutTimer}s
+                    </Text>
+                  )}
+                </View>
+              </>
+            ) : (
+              <Text style={{ fontSize: 22, fontWeight: "bold", color: "red" }}>
+                Match Over!
+              </Text>
+            )}
+          </View>
         </View>
 
         <View
-          style={[
-            styles.card,
-            { flex: 1, marginLeft: 5, alignItems: "center" },
-          ]}
+          style={{ opacity: matchRunning ? 1 : 0.4 }}
+          pointerEvents={matchRunning ? "auto" : "none"}
         >
-          {gamePhase !== "ended" ? (
-            <>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{ fontSize: 22, fontWeight: "bold", marginBottom: 6 }}
-                >
-                  {formatTime(matchTimer)}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.controlBtn, { backgroundColor: "#2196F3" }]}
-                  onPress={() => setMatchRunning((prev) => !prev)}
-                  disabled={gamePhase === "halftime"}
-                >
-                  <Text style={styles.controlBtnText}>
-                    {matchRunning ? "Pause" : "Start"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+          {renderTeamSection(
+            1,
+            team1Name,
+            team1Players,
+            setTeam1Players,
+            team1Score,
+            setTeam1Score,
+            team1RaidTimer,
+            team1RaidRunning,
+            setTeam1RaidRunning,
+            team1DropdownOpen,
+            setTeam1DropdownOpen,
+            team1DropdownValue,
+            setTeam1DropdownValue,
+            team1DropdownItems,
+            setTeam1DropdownItems,
+            team2Players
+          )}
 
-              {gamePhase === "first" && (
-                <TouchableOpacity
-                  style={[
-                    styles.controlBtn,
-                    { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" }, // grey when disabled, green when enabled
-                  ]}
-                  disabled={matchTimer > 0}
-                  onPress={handleHalfTimePress}
-                >
-                  <Text style={styles.controlBtnText}>Half Time</Text>
-                </TouchableOpacity>
-              )}
-
-              {gamePhase === "halftime" && (
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={handleHalftimeEnd}
-                >
-                  <Text style={styles.controlBtnText}>Halftime End</Text>
-                </TouchableOpacity>
-              )}
-
-              {gamePhase === "second" && (
-                <TouchableOpacity
-                  style={[
-                    styles.controlBtn,
-                    { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" },
-                  ]}
-                  disabled={matchTimer > 0}
-                  onPress={handleFullTime}
-                >
-                  <Text style={styles.controlBtnText}>Full Time</Text>
-                </TouchableOpacity>
-              )}
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginTop: 10,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => setTimeoutRunning(true)}
-                  style={[styles.controlBtn, { paddingHorizontal: 16 }]}
-                >
-                  <Text style={styles.controlBtnText}>Timeout</Text>
-                </TouchableOpacity>
-                {timeoutRunning && (
-                  <Text style={{ marginLeft: 10, fontSize: 16 }}>
-                    {timeoutTimer}s
-                  </Text>
-                )}
-              </View>
-            </>
-          ) : (
-            <Text style={{ fontSize: 22, fontWeight: "bold", color: "red" }}>
-              Match Over!
-            </Text>
+          {renderTeamSection(
+            2,
+            team2Name,
+            team2Players,
+            setTeam2Players,
+            team2Score,
+            setTeam2Score,
+            team2RaidTimer,
+            team2RaidRunning,
+            setTeam2RaidRunning,
+            team2DropdownOpen,
+            setTeam2DropdownOpen,
+            team2DropdownValue,
+            setTeam2DropdownValue,
+            team2DropdownItems,
+            setTeam2DropdownItems,
+            team1Players
           )}
         </View>
-      </View>
-
-      <View
-        style={{ opacity: matchRunning ? 1 : 0.4 }}
-        pointerEvents={matchRunning ? "auto" : "none"}
-      >
-        {renderTeamSection(
-          1,
-          team1Name,
-          team1Players,
-          setTeam1Players,
-          team1Score,
-          setTeam1Score,
-          team1RaidTimer,
-          team1RaidRunning,
-          setTeam1RaidRunning,
-          team1DropdownOpen,
-          setTeam1DropdownOpen,
-          team1DropdownValue,
-          setTeam1DropdownValue,
-          team1DropdownItems,
-          setTeam1DropdownItems,
-          team2Players
-        )}
-
-        {renderTeamSection(
-          2,
-          team2Name,
-          team2Players,
-          setTeam2Players,
-          team2Score,
-          setTeam2Score,
-          team2RaidTimer,
-          team2RaidRunning,
-          setTeam2RaidRunning,
-          team2DropdownOpen,
-          setTeam2DropdownOpen,
-          team2DropdownValue,
-          setTeam2DropdownValue,
-          team2DropdownItems,
-          setTeam2DropdownItems,
-          team1Players
-        )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -998,5 +1051,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginTop: 4,
+  },
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  stickyText: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
