@@ -106,6 +106,8 @@ export default function ScoreScreen() {
   const [team2PendingEmpty, setTeam2PendingEmpty] = useState(false);
 
   const [doOrDieTeam, setDoOrDieTeam] = useState<1 | 2 | null>(null);
+  const [showDropdownWarning, setShowDropdownWarning] = useState(false);
+const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
 
   useEffect(() => {
     if (matchRunning) {
@@ -275,6 +277,17 @@ export default function ScoreScreen() {
     opponentPlayers: PlayerStatus[]
   ) => {
     const handleScore = (pts: number) => {
+      const isFoul =
+        (teamNum === 1 && team1FoulChecked) ||
+        (teamNum === 2 && team2FoulChecked);
+
+      if (!isFoul && !dropdownValue) {
+        setShowDropdownWarning(true);
+        return;
+      }
+
+      setShowDropdownWarning(false); // clear warning once selected
+
       setScore((prev) => prev + pts);
 
       const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
@@ -282,7 +295,6 @@ export default function ScoreScreen() {
         teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
       setActionStack([...actionStack, { type: "score", value: pts }]);
 
-      // ✅ Only reset empty raid if the team is currently raiding
       const isRaiding =
         (teamNum === 1 && team1RaidRunning) ||
         (teamNum === 2 && team2RaidRunning);
@@ -295,6 +307,11 @@ export default function ScoreScreen() {
           setTeam2EmptyRaidCount(0);
           setTeam2PendingEmpty(false);
         }
+      }
+
+      // Reset foul
+      if (isFoul) {
+        teamNum === 1 ? setTeam1FoulChecked(false) : setTeam2FoulChecked(false);
       }
     };
 
@@ -466,9 +483,22 @@ export default function ScoreScreen() {
                   teamNum === 1 ? team1DropdownValue : team2DropdownValue;
 
                 // 🟡 Mark this as a pending empty raid if no score happened
+                // 🟡 Mark this as a pending empty raid if no score happened
                 if (dropdownVal && actions.length === 0) {
-                  if (teamNum === 1) setTeam1PendingEmpty(true);
-                  else setTeam2PendingEmpty(true);
+                  if (doOrDieTeam === teamNum) {
+                    // If it was a Do-Or-Die raid and still empty → reset empty count
+                    if (teamNum === 1) {
+                      setTeam1EmptyRaidCount(0);
+                      setDoOrDieTeam(null);
+                    } else {
+                      setTeam2EmptyRaidCount(0);
+                      setDoOrDieTeam(null);
+                    }
+                  } else {
+                    // Else: mark pending empty as usual
+                    if (teamNum === 1) setTeam1PendingEmpty(true);
+                    else setTeam2PendingEmpty(true);
+                  }
                 }
 
                 // Reset dropdowns
@@ -498,16 +528,43 @@ export default function ScoreScreen() {
           </View>
 
           <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
-            <DropDownPicker
-              open={dropdownOpen}
-              value={dropdownValue}
-              items={dropdownItems}
-              setOpen={setDropdownOpen}
-              setValue={setDropdownValue}
-              setItems={setDropdownItems}
-              placeholder={raidRunning ? "Select Raider" : "Select Defender"}
-              containerStyle={{ marginBottom: 10 }}
-            />
+       <DropDownPicker
+  open={dropdownOpen}
+  value={dropdownValue}
+  items={dropdownItems}
+  setOpen={setDropdownOpen}
+  setValue={(val) => {
+    setDropdownValue(val);
+    setShowDropdownWarning(false);
+  }}
+  setItems={setDropdownItems}
+  placeholder={
+    raidRunning
+      ? showDropdownWarning && !dropdownValue
+        ? "! Select Raider"
+        : "Select Raider"
+      : showDropdownWarning && !dropdownValue
+      ? "! Select Defender"
+      : "Select Defender"
+  }
+  placeholderStyle={{
+    color: showDropdownWarning && !dropdownValue ? "red" : "#000",
+    fontWeight: showDropdownWarning && !dropdownValue ? "bold" : "normal",
+  }}
+  containerStyle={{ marginBottom: 10 }}
+  style={{
+    borderColor:
+      showDropdownWarning && !dropdownValue ? "red" : "#ccc",
+    borderWidth: 1,
+    opacity: disableDropdowns ? 0.5 : 1, // 👈 lowered opacity
+  }}
+  dropDownContainerStyle={{
+    opacity: disableDropdowns ? 0.5 : 1,
+  }}
+  disabled={disableDropdowns} // 👈 disables selection
+/>
+
+
             <View
               style={{
                 flexDirection: "row",
@@ -627,18 +684,23 @@ export default function ScoreScreen() {
               })}
 
               {/* Show tackle button only if defending */}
-              {isThisTeamDefending && (
-                <TouchableOpacity
-                  onPress={handleTackle}
-                  style={styles.scoreBtn}
-                >
-                  <Text style={styles.scoreBtnText}>
-                    {defendersIn <= 3 && isSuperTackleAllowed
-                      ? "Sup/Tac"
-                      : "Tackle"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={handleTackle}
+                disabled={!isThisTeamDefending || raidRunning}
+                style={[
+                  styles.scoreBtn,
+                  (!isThisTeamDefending || raidRunning) && {
+                    backgroundColor: "gray",
+                    opacity: 0.6,
+                  },
+                ]}
+              >
+                <Text style={styles.scoreBtnText}>
+                  {defendersIn <= 3 && isSuperTackleAllowed
+                    ? "Sup/Tac"
+                    : "Tackle"}
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity onPress={handleUndo} style={styles.scoreBtn}>
                 <Text style={styles.scoreBtnText}>Undo</Text>
@@ -650,19 +712,25 @@ export default function ScoreScreen() {
     );
   };
 
-  const renderDots = (players: PlayerStatus[]) => (
+const renderDots = (players: PlayerStatus[]) => {
+  const totalOut = players.filter((p) => p.out).length;
+  const totalPlayers = players.length;
+
+  return (
     <View style={{ flexDirection: "row", marginVertical: 4 }}>
-      {players.map((p, idx) => (
+      {Array.from({ length: totalPlayers }).map((_, idx) => (
         <FontAwesome
           key={idx}
           name="circle"
           size={14}
-          color={p.out ? "gray" : "green"}
+          color={idx < totalOut ? "gray" : "green"}
           style={{ marginRight: 4 }}
         />
       ))}
     </View>
   );
+};
+
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -788,43 +856,48 @@ export default function ScoreScreen() {
         </View>
       </View>
 
-      {renderTeamSection(
-        1,
-        team1Name,
-        team1Players,
-        setTeam1Players,
-        team1Score,
-        setTeam1Score,
-        team1RaidTimer,
-        team1RaidRunning,
-        setTeam1RaidRunning,
-        team1DropdownOpen,
-        setTeam1DropdownOpen,
-        team1DropdownValue,
-        setTeam1DropdownValue,
-        team1DropdownItems,
-        setTeam1DropdownItems,
-        team2Players
-      )}
+      <View
+        style={{ opacity: matchRunning ? 1 : 0.4 }}
+        pointerEvents={matchRunning ? "auto" : "none"}
+      >
+        {renderTeamSection(
+          1,
+          team1Name,
+          team1Players,
+          setTeam1Players,
+          team1Score,
+          setTeam1Score,
+          team1RaidTimer,
+          team1RaidRunning,
+          setTeam1RaidRunning,
+          team1DropdownOpen,
+          setTeam1DropdownOpen,
+          team1DropdownValue,
+          setTeam1DropdownValue,
+          team1DropdownItems,
+          setTeam1DropdownItems,
+          team2Players
+        )}
 
-      {renderTeamSection(
-        2,
-        team2Name,
-        team2Players,
-        setTeam2Players,
-        team2Score,
-        setTeam2Score,
-        team2RaidTimer,
-        team2RaidRunning,
-        setTeam2RaidRunning,
-        team2DropdownOpen,
-        setTeam2DropdownOpen,
-        team2DropdownValue,
-        setTeam2DropdownValue,
-        team2DropdownItems,
-        setTeam2DropdownItems,
-        team1Players
-      )}
+        {renderTeamSection(
+          2,
+          team2Name,
+          team2Players,
+          setTeam2Players,
+          team2Score,
+          setTeam2Score,
+          team2RaidTimer,
+          team2RaidRunning,
+          setTeam2RaidRunning,
+          team2DropdownOpen,
+          setTeam2DropdownOpen,
+          team2DropdownValue,
+          setTeam2DropdownValue,
+          team2DropdownItems,
+          setTeam2DropdownItems,
+          team1Players
+        )}
+      </View>
     </ScrollView>
   );
 }
