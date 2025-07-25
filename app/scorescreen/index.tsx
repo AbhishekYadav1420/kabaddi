@@ -26,7 +26,15 @@ export default function ScoreScreen() {
 
   const team1Name = team1 || "Team 1";
   const team2Name = team2 || "Team 2";
-  const matchTime = parseInt(time || "600");
+  const matchTime = (() => {
+  if (!time) return 600; // default 10 min
+  const parts = time.split(":");
+  if (parts.length !== 2) return 600;
+  const minutes = parseInt(parts[0]);
+  const seconds = parseInt(parts[1]);
+  return minutes * 60 + seconds;
+})();
+
 
   const initialTeam1Players: PlayerStatus[] = JSON.parse(
     playersTeam1 || "[]"
@@ -249,19 +257,18 @@ export default function ScoreScreen() {
   ) => {
     const handleScore = (pts: number) => {
       let finalPoints = pts;
-const handleScore = (pts: number) => {
-  setScore((prev) => prev + pts);
+      const handleScore = (pts: number) => {
+        setScore((prev) => prev + pts);
 
-  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-  const setActionStack =
-    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-  setActionStack([...actionStack, { type: "score", value: pts }]);
+        const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+        const setActionStack =
+          teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+        setActionStack([...actionStack, { type: "score", value: pts }]);
 
-  // Reset empty raid count since score is given
-  if (teamNum === 1) setTeam1EmptyRaidCount(0);
-  else setTeam2EmptyRaidCount(0);
-};
-
+        // Reset empty raid count since score is given
+        if (teamNum === 1) setTeam1EmptyRaidCount(0);
+        else setTeam2EmptyRaidCount(0);
+      };
 
       setScore((prev) => prev + finalPoints);
 
@@ -370,63 +377,70 @@ const handleScore = (pts: number) => {
           {renderDots(players)}
           <Text style={styles.timerText}>{raidTimer}s</Text>
           <TouchableOpacity
-         onPress={() => {
-  const newState = !raidRunning;
+            onPress={() => {
+              const newState = !raidRunning;
 
-  // 🟢 Only clear raid actions when NEW raid is starting
-  if (newState) {
-    const setActions =
-      teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-    setActions([]);
-  }
+              // 🟢 Only clear raid actions when NEW raid is starting
+              if (newState) {
+                const setActions =
+                  teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+                setActions([]);
+              }
 
-  setRaidRunning(newState);
+              setRaidRunning(newState);
 
-  // Reset dropdown selection when raid ends
-  if (!newState) {
-    const actions = teamNum === 1 ? team1RaidActions : team2RaidActions;
-    const dropdownVal = teamNum === 1 ? team1DropdownValue : team2DropdownValue;
-    const playersList = teamNum === 1 ? [...team1Players] : [...team2Players];
-    const setPlayersList = teamNum === 1 ? setTeam1Players : setTeam2Players;
+              // Reset dropdown selection when raid ends
+              if (!newState) {
+                const actions =
+                  teamNum === 1 ? team1RaidActions : team2RaidActions;
+                const dropdownVal =
+                  teamNum === 1 ? team1DropdownValue : team2DropdownValue;
+                const playersList =
+                  teamNum === 1 ? [...team1Players] : [...team2Players];
+                const setPlayersList =
+                  teamNum === 1 ? setTeam1Players : setTeam2Players;
 
-    if (dropdownVal && actions.length === 0) {
-      if (teamNum === 1) {
-        setTeam1EmptyRaidCount((prev) => {
-          if (prev === 2) {
-            const idx = playersList.findIndex((p) => p.name === dropdownVal);
-            if (idx !== -1) {
-              playersList[idx].out = true;
-              setTeam1Players(playersList);
-            }
-            return 0;
-          }
-          return prev + 1;
-        });
-      } else {
-        setTeam2EmptyRaidCount((prev) => {
-          if (prev === 2) {
-            const idx = playersList.findIndex((p) => p.name === dropdownVal);
-            if (idx !== -1) {
-              playersList[idx].out = true;
-              setTeam2Players(playersList);
-            }
-            return 0;
-          }
-          return prev + 1;
-        });
-      }
-    } else {
-      // reset empty raid
-      setTeam1EmptyRaidCount(0);
-      setTeam2EmptyRaidCount(0);
-    }
+                if (dropdownVal && actions.length === 0) {
+                  if (teamNum === 1) {
+                    setTeam1EmptyRaidCount((prev) => {
+                      if (prev === 2) {
+                        const idx = playersList.findIndex(
+                          (p) => p.name === dropdownVal
+                        );
+                        if (idx !== -1) {
+                          playersList[idx].out = true;
+                          setTeam1Players(playersList);
+                        }
+                        return 0;
+                      }
+                      return prev + 1;
+                    });
+                  } else {
+                    setTeam2EmptyRaidCount((prev) => {
+                      if (prev === 2) {
+                        const idx = playersList.findIndex(
+                          (p) => p.name === dropdownVal
+                        );
+                        if (idx !== -1) {
+                          playersList[idx].out = true;
+                          setTeam2Players(playersList);
+                        }
+                        return 0;
+                      }
+                      return prev + 1;
+                    });
+                  }
+                } else {
+                  // reset empty raid
+                  setTeam1EmptyRaidCount(0);
+                  setTeam2EmptyRaidCount(0);
+                }
 
-    // ✅ Reset BOTH dropdowns when any raid ends
-    setTeam1DropdownValue(null);
-    setTeam2DropdownValue(null);
-  }
-}}
-
+                // ✅ Reset BOTH dropdowns when any raid ends
+                setTeam1DropdownValue(null);
+                setTeam2DropdownValue(null);
+              }
+            }}
             style={styles.btn}
           >
             <Text style={styles.btnText}>{raidRunning ? "End" : "Start"}</Text>
@@ -467,18 +481,23 @@ const handleScore = (pts: number) => {
               }}
             >
               <TouchableOpacity
-onPress={() => {
-  if (teamNum === 1) {
-    setTeam1Score((prev) => prev + 1);
-    setTeam1FoulChecked(false);
-    setTeam1RaidActions((prev) => [...prev, { type: "score", value: 1 }]);
-  } else {
-    setTeam2Score((prev) => prev + 1);
-    setTeam2FoulChecked(false);
-    setTeam2RaidActions((prev) => [...prev, { type: "score", value: 1 }]);
-  }
-}}
-
+                onPress={() => {
+                  if (teamNum === 1) {
+                    setTeam1Score((prev) => prev + 1);
+                    setTeam1FoulChecked(false);
+                    setTeam1RaidActions((prev) => [
+                      ...prev,
+                      { type: "score", value: 1 },
+                    ]);
+                  } else {
+                    setTeam2Score((prev) => prev + 1);
+                    setTeam2FoulChecked(false);
+                    setTeam2RaidActions((prev) => [
+                      ...prev,
+                      { type: "score", value: 1 },
+                    ]);
+                  }
+                }}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
@@ -662,15 +681,19 @@ onPress={() => {
                 </TouchableOpacity>
               </View>
 
-              {gamePhase === "first" && (
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  disabled={matchTimer > 0}
-                  onPress={handleHalfTimePress}
-                >
-                  <Text style={styles.controlBtnText}>Half Time</Text>
-                </TouchableOpacity>
-              )}
+          {gamePhase === "first" && (
+  <TouchableOpacity
+    style={[
+      styles.controlBtn,
+      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" }, // grey when disabled, green when enabled
+    ]}
+    disabled={matchTimer > 0}
+    onPress={handleHalfTimePress}
+  >
+    <Text style={styles.controlBtnText}>Half Time</Text>
+  </TouchableOpacity>
+)}
+
 
               {gamePhase === "halftime" && (
                 <TouchableOpacity
@@ -681,15 +704,19 @@ onPress={() => {
                 </TouchableOpacity>
               )}
 
-              {gamePhase === "second" && (
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  disabled={matchTimer > 0}
-                  onPress={handleFullTime}
-                >
-                  <Text style={styles.controlBtnText}>Full Time</Text>
-                </TouchableOpacity>
-              )}
+{gamePhase === "second" && (
+  <TouchableOpacity
+    style={[
+      styles.controlBtn,
+      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" },
+    ]}
+    disabled={matchTimer > 0}
+    onPress={handleFullTime}
+  >
+    <Text style={styles.controlBtnText}>Full Time</Text>
+  </TouchableOpacity>
+)}
+
 
               <View
                 style={{
