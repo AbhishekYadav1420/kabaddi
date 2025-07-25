@@ -14,27 +14,38 @@ import DropDownPicker from "react-native-dropdown-picker";
 type PlayerStatus = { name: string; out: boolean };
 
 export default function ScoreScreen() {
-  const { team1, team2, playersTeam1, playersTeam2, toss, time } =
-    useLocalSearchParams<{
-      team1: string;
-      team2: string;
-      playersTeam1: string;
-      playersTeam2: string;
-      toss: string;
-      time: string;
-    }>();
+  const {
+    team1,
+    team2,
+    playersTeam1,
+    playersTeam2,
+    time,
+    bonusAllowed,
+    superTackleAllowed,
+    choice,
+    selectedTossWinner,
+  } = useLocalSearchParams<{
+    team1: string;
+    team2: string;
+    playersTeam1: string;
+    playersTeam2: string;
+    selectedTossWinner: string;
+    choice: string;
+    time: string;
+    bonusAllowed: string;
+    superTackleAllowed: string;
+  }>();
 
   const team1Name = team1 || "Team 1";
   const team2Name = team2 || "Team 2";
   const matchTime = (() => {
-  if (!time) return 600; // default 10 min
-  const parts = time.split(":");
-  if (parts.length !== 2) return 600;
-  const minutes = parseInt(parts[0]);
-  const seconds = parseInt(parts[1]);
-  return minutes * 60 + seconds;
-})();
-
+    if (!time) return 600; // default 10 min
+    const parts = time.split(":");
+    if (parts.length !== 2) return 600;
+    const minutes = parseInt(parts[0]);
+    const seconds = parseInt(parts[1]);
+    return minutes * 60 + seconds;
+  })();
 
   const initialTeam1Players: PlayerStatus[] = JSON.parse(
     playersTeam1 || "[]"
@@ -47,6 +58,9 @@ export default function ScoreScreen() {
     useState<PlayerStatus[]>(initialTeam1Players);
   const [team2Players, setTeam2Players] =
     useState<PlayerStatus[]>(initialTeam2Players);
+
+  const isBonusAllowed = bonusAllowed === "true";
+  const isSuperTackleAllowed = superTackleAllowed === "true";
 
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
@@ -87,6 +101,11 @@ export default function ScoreScreen() {
 
   const [team1EmptyRaidCount, setTeam1EmptyRaidCount] = useState(0);
   const [team2EmptyRaidCount, setTeam2EmptyRaidCount] = useState(0);
+
+  const [team1PendingEmpty, setTeam1PendingEmpty] = useState(false);
+  const [team2PendingEmpty, setTeam2PendingEmpty] = useState(false);
+
+  const [doOrDieTeam, setDoOrDieTeam] = useState<1 | 2 | null>(null);
 
   useEffect(() => {
     if (matchRunning) {
@@ -256,35 +275,32 @@ export default function ScoreScreen() {
     opponentPlayers: PlayerStatus[]
   ) => {
     const handleScore = (pts: number) => {
-      let finalPoints = pts;
-      const handleScore = (pts: number) => {
-        setScore((prev) => prev + pts);
-
-        const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-        const setActionStack =
-          teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-        setActionStack([...actionStack, { type: "score", value: pts }]);
-
-        // Reset empty raid count since score is given
-        if (teamNum === 1) setTeam1EmptyRaidCount(0);
-        else setTeam2EmptyRaidCount(0);
-      };
-
-      setScore((prev) => prev + finalPoints);
+      setScore((prev) => prev + pts);
 
       const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
       const setActionStack =
         teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-      setActionStack([...actionStack, { type: "score", value: finalPoints }]);
+      setActionStack([...actionStack, { type: "score", value: pts }]);
 
-      // Reset empty raid count since score is given
-      if (teamNum === 1) setTeam1EmptyRaidCount(0);
-      else setTeam2EmptyRaidCount(0);
+      // ✅ Only reset empty raid if the team is currently raiding
+      const isRaiding =
+        (teamNum === 1 && team1RaidRunning) ||
+        (teamNum === 2 && team2RaidRunning);
+
+      if (isRaiding) {
+        if (teamNum === 1) {
+          setTeam1EmptyRaidCount(0);
+          setTeam1PendingEmpty(false);
+        } else {
+          setTeam2EmptyRaidCount(0);
+          setTeam2PendingEmpty(false);
+        }
+      }
     };
 
     const handleTackle = () => {
       const defendersIn = players.filter((p) => !p.out).length;
-      const points = defendersIn <= 3 ? 2 : 1;
+      const points = defendersIn <= 3 && isSuperTackleAllowed ? 2 : 1;
 
       // This team is the defender, award points to this team
       setScore((prev) => prev + points);
@@ -382,8 +398,61 @@ export default function ScoreScreen() {
 
               // 🟢 Only clear raid actions when NEW raid is starting
               if (newState) {
-                const setActions =
-                  teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+                const isTeam1 = teamNum === 1;
+                if (newState) {
+                  if (teamNum === 1 && team1EmptyRaidCount === 2) {
+                    setDoOrDieTeam(1);
+                    setTeam1EmptyRaidCount(0);
+                  } else if (teamNum === 2 && team2EmptyRaidCount === 2) {
+                    setDoOrDieTeam(2);
+                    setTeam2EmptyRaidCount(0);
+                  } else {
+                    setDoOrDieTeam(null);
+                  }
+                }
+
+                // 🟠 Confirm if previous raid was empty and update count
+                // ✅ Check if the *opponent* has a pending empty raid before starting this team's raid
+                if (isTeam1 && team2PendingEmpty) {
+                  setTeam2EmptyRaidCount((prev) => {
+                    if (prev === 2) {
+                      const idx = team2Players.findIndex(
+                        (p) => p.name === team2DropdownValue
+                      );
+                      if (idx !== -1) {
+                        const updated = [...team2Players];
+                        updated[idx].out = true;
+                        setTeam2Players(updated);
+                      }
+                      return 0;
+                    }
+                    return prev + 1;
+                  });
+                  setTeam2PendingEmpty(false);
+                }
+
+                if (!isTeam1 && team1PendingEmpty) {
+                  setTeam1EmptyRaidCount((prev) => {
+                    if (prev === 2) {
+                      const idx = team1Players.findIndex(
+                        (p) => p.name === team1DropdownValue
+                      );
+                      if (idx !== -1) {
+                        const updated = [...team1Players];
+                        updated[idx].out = true;
+                        setTeam1Players(updated);
+                      }
+                      return 0;
+                    }
+                    return prev + 1;
+                  });
+                  setTeam1PendingEmpty(false);
+                }
+
+                // Clear raid actions for new raid
+                const setActions = isTeam1
+                  ? setTeam1RaidActions
+                  : setTeam2RaidActions;
                 setActions([]);
               }
 
@@ -395,48 +464,14 @@ export default function ScoreScreen() {
                   teamNum === 1 ? team1RaidActions : team2RaidActions;
                 const dropdownVal =
                   teamNum === 1 ? team1DropdownValue : team2DropdownValue;
-                const playersList =
-                  teamNum === 1 ? [...team1Players] : [...team2Players];
-                const setPlayersList =
-                  teamNum === 1 ? setTeam1Players : setTeam2Players;
 
+                // 🟡 Mark this as a pending empty raid if no score happened
                 if (dropdownVal && actions.length === 0) {
-                  if (teamNum === 1) {
-                    setTeam1EmptyRaidCount((prev) => {
-                      if (prev === 2) {
-                        const idx = playersList.findIndex(
-                          (p) => p.name === dropdownVal
-                        );
-                        if (idx !== -1) {
-                          playersList[idx].out = true;
-                          setTeam1Players(playersList);
-                        }
-                        return 0;
-                      }
-                      return prev + 1;
-                    });
-                  } else {
-                    setTeam2EmptyRaidCount((prev) => {
-                      if (prev === 2) {
-                        const idx = playersList.findIndex(
-                          (p) => p.name === dropdownVal
-                        );
-                        if (idx !== -1) {
-                          playersList[idx].out = true;
-                          setTeam2Players(playersList);
-                        }
-                        return 0;
-                      }
-                      return prev + 1;
-                    });
-                  }
-                } else {
-                  // reset empty raid
-                  setTeam1EmptyRaidCount(0);
-                  setTeam2EmptyRaidCount(0);
+                  if (teamNum === 1) setTeam1PendingEmpty(true);
+                  else setTeam2PendingEmpty(true);
                 }
 
-                // ✅ Reset BOTH dropdowns when any raid ends
+                // Reset dropdowns
                 setTeam1DropdownValue(null);
                 setTeam2DropdownValue(null);
               }
@@ -518,7 +553,13 @@ export default function ScoreScreen() {
                 <Text style={{ marginLeft: 8 }}>Foul</Text>
               </TouchableOpacity>
 
-              <View style={{ flexDirection: "row", marginLeft: 20 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  marginLeft: 20,
+                  alignItems: "center",
+                }}
+              >
                 {[0, 1, 2].map((dot) => {
                   const filled =
                     (teamNum === 1
@@ -534,12 +575,13 @@ export default function ScoreScreen() {
                     />
                   );
                 })}
-                {(teamNum === 1 ? team1EmptyRaidCount : team2EmptyRaidCount) ===
-                  3 && (
+
+                {/* ✅ Show 'Do-Or-Die Raid' text during raid */}
+                {doOrDieTeam === teamNum && raidRunning && (
                   <Text
-                    style={{ color: "red", marginLeft: 6, fontWeight: "bold" }}
+                    style={{ color: "red", marginLeft: 10, fontWeight: "bold" }}
                   >
-                    Do-or-Die!
+                    Do-Or-Die Raid
                   </Text>
                 )}
               </View>
@@ -553,12 +595,14 @@ export default function ScoreScreen() {
                       key={label}
                       onPress={() => handleScore(1)}
                       disabled={
+                        !isBonusAllowed ||
                         opponentPlayers.filter((p) => !p.out).length < 6
                       }
                       style={[
                         styles.scoreBtn,
                         {
                           backgroundColor:
+                            !isBonusAllowed ||
                             opponentPlayers.filter((p) => !p.out).length < 6
                               ? "gray"
                               : "#FF9800",
@@ -569,13 +613,15 @@ export default function ScoreScreen() {
                     </TouchableOpacity>
                   );
                 }
+
+                // Circular style for 1–7 buttons
                 return (
                   <TouchableOpacity
                     key={label}
                     onPress={() => handleScore(parseInt(label))}
-                    style={styles.scoreBtn}
+                    style={styles.circleBtn}
                   >
-                    <Text style={styles.scoreBtnText}>{label}</Text>
+                    <Text style={styles.circleBtnText}>{label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -587,7 +633,9 @@ export default function ScoreScreen() {
                   style={styles.scoreBtn}
                 >
                   <Text style={styles.scoreBtnText}>
-                    {defendersIn <= 3 ? "Super Tackle" : "Tackle"}
+                    {defendersIn <= 3 && isSuperTackleAllowed
+                      ? "Sup/Tac"
+                      : "Tackle"}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -626,25 +674,21 @@ export default function ScoreScreen() {
         }}
       >
         <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "bold",
-              textAlign: "center",
-              justifyContent: "center",
-            }}
-          >
+          {/* Toss and Choice Row */}
+          <View style={{ marginBottom: 6 }}>
+            <Text style={styles.tossRow}>
+              Toss: {selectedTossWinner === "team1" ? team1Name : team2Name} |
+              Choice: {choice}
+            </Text>
+          </View>
+
+          {/* Team Names Row */}
+          <Text style={styles.teamNames}>
             {team1Name} | {team2Name}
           </Text>
-          <Text
-            style={{
-              fontSize: 28,
-              fontWeight: "bold",
-              textAlign: "center",
-              marginTop: 4,
-              justifyContent: "center",
-            }}
-          >
+
+          {/* Score Row */}
+          <Text style={styles.scoreRow}>
             {team1Score.toString().padStart(2, "0")} :{" "}
             {team2Score.toString().padStart(2, "0")}
           </Text>
@@ -681,19 +725,18 @@ export default function ScoreScreen() {
                 </TouchableOpacity>
               </View>
 
-          {gamePhase === "first" && (
-  <TouchableOpacity
-    style={[
-      styles.controlBtn,
-      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" }, // grey when disabled, green when enabled
-    ]}
-    disabled={matchTimer > 0}
-    onPress={handleHalfTimePress}
-  >
-    <Text style={styles.controlBtnText}>Half Time</Text>
-  </TouchableOpacity>
-)}
-
+              {gamePhase === "first" && (
+                <TouchableOpacity
+                  style={[
+                    styles.controlBtn,
+                    { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" }, // grey when disabled, green when enabled
+                  ]}
+                  disabled={matchTimer > 0}
+                  onPress={handleHalfTimePress}
+                >
+                  <Text style={styles.controlBtnText}>Half Time</Text>
+                </TouchableOpacity>
+              )}
 
               {gamePhase === "halftime" && (
                 <TouchableOpacity
@@ -704,19 +747,18 @@ export default function ScoreScreen() {
                 </TouchableOpacity>
               )}
 
-{gamePhase === "second" && (
-  <TouchableOpacity
-    style={[
-      styles.controlBtn,
-      { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" },
-    ]}
-    disabled={matchTimer > 0}
-    onPress={handleFullTime}
-  >
-    <Text style={styles.controlBtnText}>Full Time</Text>
-  </TouchableOpacity>
-)}
-
+              {gamePhase === "second" && (
+                <TouchableOpacity
+                  style={[
+                    styles.controlBtn,
+                    { backgroundColor: matchTimer > 0 ? "#ccc" : "#4CAF50" },
+                  ]}
+                  disabled={matchTimer > 0}
+                  onPress={handleFullTime}
+                >
+                  <Text style={styles.controlBtnText}>Full Time</Text>
+                </TouchableOpacity>
+              )}
 
               <View
                 style={{
@@ -853,5 +895,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#fff",
+  },
+  circleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#2196F3",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 5,
+  },
+  circleBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  tossRow: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#555",
+    textAlign: "left",
+  },
+  teamNames: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  scoreRow: {
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: 4,
   },
 });
