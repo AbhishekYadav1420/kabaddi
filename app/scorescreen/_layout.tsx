@@ -1,6 +1,6 @@
 // app/scorescreen/_layout.tsx
-import { Tabs } from 'expo-router';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
 export default function ScoreScreenLayout() {
   return (
@@ -47,5 +47,6 @@ export default function ScoreScreenLayout() {
         }}
       />
     </Tabs>
+     
   );
 }

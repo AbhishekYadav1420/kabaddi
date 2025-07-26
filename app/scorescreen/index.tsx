@@ -617,7 +617,7 @@ const scrollOffsetY = useRef(0);
                   flexDirection: "row",
                   alignItems: "center",
                   backgroundColor: "#ddd",
-                  padding: 6,
+                  padding: 3,
                   borderRadius: 6,
                 }}
               >
@@ -657,13 +657,12 @@ const scrollOffsetY = useRef(0);
                 })}
 
                 {/* ✅ Show 'Do-Or-Die Raid' text during raid */}
-                {doOrDieTeam === teamNum && raidRunning && (
-                  <Text
-                    style={{ color: "red", marginLeft: 10, fontWeight: "bold" }}
-                  >
-                    Do-Or-Die Raid
-                  </Text>
-                )}
+               {doOrDieTeam === teamNum && raidRunning && (
+  <View style={styles.doOrDieContainer}>
+    <Text style={styles.doOrDieText}>Do-Or-Die</Text>
+  </View>
+)}
+
               </View>
             </View>
 
@@ -956,101 +955,123 @@ const scrollOffsetY = useRef(0);
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 10 },
+  container: {
+    padding: 8,
+    paddingBottom: 50, // Ensure bottom spacing for scroll
+  },
   card: {
     backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
+    padding: 8,
+    borderRadius: 8,
   },
   controlBtn: {
     backgroundColor: "#4CAF50",
-    padding: 10,
-    marginVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginVertical: 3,
+    borderRadius: 6,
     alignItems: "center",
   },
   controlBtnText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontSize: 12,
   },
   teamSection: {
-    marginBottom: 16,
-    padding: 10,
+    marginBottom: 10,
+    padding: 8,
     backgroundColor: "#eee",
-    borderRadius: 12,
+    borderRadius: 10,
   },
   teamHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  teamTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
-  timerText: { fontSize: 16, marginHorizontal: 6 },
+  teamTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+  },
+  timerText: {
+    fontSize: 14,
+    marginHorizontal: 4,
+  },
   btn: {
     backgroundColor: "#4CAF50",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 5,
   },
-  btnText: { color: "white", fontWeight: "bold" },
-  cardRow: { flexDirection: "row" },
+  btnText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  cardRow: {
+    flexDirection: "row",
+  },
   playerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   outBtn: {
     color: "red",
     fontWeight: "bold",
+    fontSize: 12,
   },
   scoreBtnGroup: {
     flexWrap: "wrap",
     flexDirection: "row",
-    gap: 6,
+    gap: 4,
     justifyContent: "center",
   },
   scoreBtn: {
-    backgroundColor: "#FF9800", // fallback color — overridden conditionally in Bonus button
-    padding: 10,
-    margin: 5,
+    backgroundColor: "#FF9800",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    margin: 3,
     alignItems: "center",
     borderRadius: 5,
   },
   scoreBtnText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "bold",
     color: "#fff",
   },
   circleBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#2196F3",
     justifyContent: "center",
     alignItems: "center",
-    margin: 5,
+    margin: 3,
   },
   circleBtnText: {
     color: "#fff",
     fontWeight: "bold",
+    fontSize: 12,
   },
   tossRow: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "500",
     color: "#555",
     textAlign: "left",
+    marginBottom: 4,
   },
   teamNames: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
   },
   scoreRow: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginTop: 4,
+    marginTop: 2,
   },
   stickyHeader: {
     position: "absolute",
@@ -1058,15 +1079,33 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#f0f0f0",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderColor: "#ccc",
     alignItems: "center",
     zIndex: 10,
   },
   stickyText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
   },
+  doOrDieContainer: {
+  backgroundColor: "#fdecea",
+  paddingVertical: 2,
+  paddingHorizontal: 8,
+  borderRadius: 6,
+  alignItems: "flex-start",
+
+  marginBottom: 6,
+  marginTop: 4,
+},
+doOrDieText: {
+  color: "#d32f2f",
+  fontWeight: "bold",
+  fontSize: 12,
+
+},
+
 });
+
