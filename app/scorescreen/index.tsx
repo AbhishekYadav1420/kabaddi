@@ -46,8 +46,18 @@ export default function ScoreScreen() {
     return minutes * 60 + seconds;
   })();
 
-  const truncateName = (name: string, maxLength = 14) =>
+const truncateName = (name: string, maxLength = 14) =>
   name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
+
+const displayedTeam1Name = truncateName(team1Name);
+const displayedTeam2Name = truncateName(team2Name);
+
+// Choose a fixed width per name based on the longest truncated name
+const charWidth = 9; // adjust based on font size
+const longestTruncatedLength = Math.max(displayedTeam1Name.length, displayedTeam2Name.length);
+const nameWidth = longestTruncatedLength * charWidth;
+const nameBlockWidth = longestTruncatedLength * charWidth;
+
 
 
   const initialTeam1Players: PlayerStatus[] = JSON.parse(
@@ -314,10 +324,19 @@ export default function ScoreScreen() {
     team2Score: number;
   }) => (
     <View style={styles.stickyHeader}>
-     <Text style={styles.stickyText}>
-  {truncateName(team1Name)} {team1Score.toString().padStart(2, "0")} :{" "}
-  {team2Score.toString().padStart(2, "0")} {truncateName(team2Name)}
-</Text>
+ <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", padding: 4 }}>
+  <Text style={[styles.stickyText,{width: nameWidth,textAlign: "center",fontWeight: "bold",overflow: "hidden",},]}numberOfLines={1}ellipsizeMode="tail">
+    {displayedTeam1Name}
+  </Text>
+
+  <Text style={[styles.stickyText,{marginHorizontal: 4,fontWeight: "bold",},]}>
+    {team1Score.toString().padStart(2, "0")} : {team2Score.toString().padStart(2, "0")}
+  </Text>
+
+  <Text style={[styles.stickyText,{width: nameWidth,textAlign: "center",fontWeight: "bold",overflow: "hidden",},]}numberOfLines={1}ellipsizeMode="tail">
+    {displayedTeam2Name}
+  </Text>
+</View>
 
     </View>
     
@@ -509,7 +528,15 @@ export default function ScoreScreen() {
     return (
       <View style={styles.teamSection}>
         <View style={styles.teamHeader}>
-          <Text style={styles.teamTitle}>{truncateName(teamName)}</Text>
+ <Text
+  style={[styles.teamTitle, { width: nameBlockWidth, textAlign: "left" }]}
+  numberOfLines={1}
+  ellipsizeMode="tail"
+>
+  {truncateName(teamName)}
+</Text>
+
+
           {renderDots(players)}
           <Text style={styles.timerText}>{raidTimer}s</Text>
           <TouchableOpacity
@@ -623,16 +650,19 @@ export default function ScoreScreen() {
         <View style={styles.cardRow}>
           <View style={[styles.card, { flex: 2, marginRight: 6 }]}>
             {players.map(
-              (p, idx) =>
-                !p.out && (
-                  <View key={idx} style={styles.playerRow}>
-                    <Text style={{ flex: 1 }}>{p.name}</Text>
-                    <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
-                      <Text style={styles.outBtn}>Out</Text>
-                    </TouchableOpacity>
-                  </View>
-                )
-            )}
+  (p, idx) =>
+    !p.out && (
+      <View key={idx} style={styles.playerRow}>
+        <Text style={{ flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+          {truncateName(p.name)}
+        </Text>
+        <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
+          <Text style={styles.outBtn}>Out</Text>
+        </TouchableOpacity>
+      </View>
+    )
+)}
+
           </View>
 
           <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
@@ -910,15 +940,25 @@ export default function ScoreScreen() {
 
             {/* Team Names Row */}
  <View style={styles.teamNamesRow}>
-  <Text style={styles.teamNameText} numberOfLines={1} ellipsizeMode="tail">
-    {team1Name}
-  </Text>
+<Text
+  style={[styles.teamNameText, { width: nameWidth, textAlign: "center" }]}
+  numberOfLines={1}
+  ellipsizeMode="tail"
+>
+  {displayedTeam1Name}
+</Text>
 
-  <Text style={styles.vsText}> v/s </Text>
+<Text style={[styles.vsText,{ fontWeight: "bold", marginHorizontal: 4 }]}>v/s</Text>
 
-  <Text style={styles.teamNameText} numberOfLines={1} ellipsizeMode="tail">
-    {team2Name}
-  </Text>
+<Text
+  style={[styles.teamNameText, { width: nameWidth, textAlign: "center" }]}
+  numberOfLines={1}
+  ellipsizeMode="tail"
+>
+  {displayedTeam2Name}
+</Text>
+
+
 </View>
 
 
