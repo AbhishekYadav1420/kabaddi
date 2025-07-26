@@ -1059,24 +1059,32 @@ const styles = StyleSheet.create({
     padding: 8,
     paddingBottom: 50, // Ensure bottom spacing for scroll
   },
-  card: {
-    backgroundColor: "#fff",
-    padding: 8,
-    borderRadius: 8,
-  },
-  controlBtn: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginVertical: 3,
-    borderRadius: 6,
-    alignItems: "center",
-  },
-  controlBtnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 12,
-  },
+card: {
+  backgroundColor: "#fff",
+  padding: 12,
+  borderRadius: 12,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+  marginVertical: 6,
+},
+
+controlBtn: {
+  backgroundColor: "#1e6cf1b9",
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderRadius: 8,
+  marginVertical: 4,
+  alignItems: "center",
+},
+controlBtnText: {
+  color: "#fff",
+  fontWeight: "600",
+  fontSize: 14,
+},
+
   teamSection: {
     marginBottom: 10,
     padding: 8,
@@ -1088,25 +1096,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 6,
+    backgroundColor: "#c5e9afff",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderColor: "#2e06b3ff",
+    borderWidth: 2,
   },
-  teamTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    flex: 1,
-  },
-  timerText: {
-    fontSize: 14,
-    marginHorizontal: 4,
-  },
+teamTitle: {
+  fontSize: 18,
+  fontWeight: "bold",
+  color: "#2e06b3ff",
+},
+timerText: {
+  fontSize: 14,
+  color: "#e80b0bff",
+  fontWeight: "bold",
+  backgroundColor: "#9dbcbbff",
+  paddingHorizontal: 10,
+  paddingVertical: 2,
+  borderRadius: 4,
+},
   btn: {
     backgroundColor: "#4CAF50",
-    paddingHorizontal: 10,
+    paddingHorizontal: 20,
     paddingVertical: 4,
     borderRadius: 5,
   },
   btnText: {
     color: "white",
-    fontWeight: "600",
+    fontWeight: "bold",
     fontSize: 12,
   },
   cardRow: {
@@ -1121,6 +1140,7 @@ const styles = StyleSheet.create({
     color: "red",
     fontWeight: "bold",
     fontSize: 12,
+  
   },
   scoreBtnGroup: {
     flexWrap: "wrap",
@@ -1161,11 +1181,13 @@ const styles = StyleSheet.create({
     color: "#555",
     textAlign: "left",
     marginBottom: 4,
+  
   },
   teamNames: {
     fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
+    color: "#2e06b3ff",
   },
   scoreRow: {
     fontSize: 24,
@@ -1178,17 +1200,18 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#c5e9afff",
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderColor: "#ccc",
+    borderBottomWidth: 2,
+    borderColor: "#2e06b3ff",
     alignItems: "center",
     zIndex: 10,
   },
   stickyText: {
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: "bold",
+    color: "#2e06b3ff",
   },
   doOrDieContainer: {
     backgroundColor: "#fdecea",
