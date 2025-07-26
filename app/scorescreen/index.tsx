@@ -1,4 +1,3 @@
-// app/scorescreen.tsx
 import { FontAwesome } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -46,6 +45,10 @@ export default function ScoreScreen() {
     const seconds = parseInt(parts[1]);
     return minutes * 60 + seconds;
   })();
+
+  const truncateName = (name: string, maxLength = 14) =>
+  name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
+
 
   const initialTeam1Players: PlayerStatus[] = JSON.parse(
     playersTeam1 || "[]"
@@ -311,11 +314,13 @@ export default function ScoreScreen() {
     team2Score: number;
   }) => (
     <View style={styles.stickyHeader}>
-      <Text style={styles.stickyText}>
-        {team1Name} {team1Score.toString().padStart(2, "0")} :{" "}
-        {team2Score.toString().padStart(2, "0")} {team2Name}
-      </Text>
+     <Text style={styles.stickyText}>
+  {truncateName(team1Name)} {team1Score.toString().padStart(2, "0")} :{" "}
+  {team2Score.toString().padStart(2, "0")} {truncateName(team2Name)}
+</Text>
+
     </View>
+    
   );
 
   const handleOut = (team: 1 | 2, index: number) => {
@@ -504,7 +509,7 @@ export default function ScoreScreen() {
     return (
       <View style={styles.teamSection}>
         <View style={styles.teamHeader}>
-          <Text style={styles.teamTitle}>{teamName}</Text>
+          <Text style={styles.teamTitle}>{truncateName(teamName)}</Text>
           {renderDots(players)}
           <Text style={styles.timerText}>{raidTimer}s</Text>
           <TouchableOpacity
@@ -845,7 +850,7 @@ export default function ScoreScreen() {
             key={idx}
             name="circle"
             size={14}
-            color={idx < totalOut ? "gray" : "green"}
+            color={idx < totalOut ? "red" : "green"}
             style={{ marginRight: 4 }}
           />
         ))}
@@ -891,16 +896,31 @@ export default function ScoreScreen() {
           <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
             {/* Toss and Choice Row */}
             <View style={{ marginBottom: 6 }}>
-              <Text style={styles.tossRow}>
-                Toss: {selectedTossWinner === "team1" ? team1Name : team2Name} |
-                Choice: {choice}
-              </Text>
+  <Text style={styles.tossRow} numberOfLines={1} ellipsizeMode="tail">
+  <Text style={styles.tossLabel}>Toss: </Text>
+  <Text style={styles.tossTeamName}>
+    {selectedTossWinner === "team1" ? team1Name : team2Name}
+  </Text>
+</Text>
+
+          <Text style={styles.tossRow}>
+   Choose: {choice}
+</Text>
             </View>
 
             {/* Team Names Row */}
-            <Text style={styles.teamNames}>
-              {team1Name} | {team2Name}
-            </Text>
+ <View style={styles.teamNamesRow}>
+  <Text style={styles.teamNameText} numberOfLines={1} ellipsizeMode="tail">
+    {team1Name}
+  </Text>
+
+  <Text style={styles.vsText}> v/s </Text>
+
+  <Text style={styles.teamNameText} numberOfLines={1} ellipsizeMode="tail">
+    {team2Name}
+  </Text>
+</View>
+
 
             {/* Score Row */}
             <Text style={styles.scoreRow}>
@@ -1057,37 +1077,37 @@ export default function ScoreScreen() {
 const styles = StyleSheet.create({
   container: {
     padding: 8,
-    paddingBottom: 50, // Ensure bottom spacing for scroll
+    paddingBottom: 30, // Ensure bottom spacing for scroll
   },
-card: {
-  backgroundColor: "#fff",
-  padding: 12,
-  borderRadius: 12,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3,
-  marginVertical: 6,
-},
+  card: {
+    backgroundColor: "#fff",
+    padding: 5,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginVertical: 6,
+  },
 
-controlBtn: {
-  backgroundColor: "#1e6cf1b9",
-  paddingVertical: 8,
-  paddingHorizontal: 16,
-  borderRadius: 8,
-  marginVertical: 4,
-  alignItems: "center",
-},
-controlBtnText: {
-  color: "#fff",
-  fontWeight: "600",
-  fontSize: 14,
-},
+  controlBtn: {
+    backgroundColor: "#1e6cf1b9",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginVertical: 4,
+    alignItems: "center",
+  },
+  controlBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
 
   teamSection: {
     marginBottom: 10,
-    padding: 8,
+    padding: 1,
     backgroundColor: "#eee",
     borderRadius: 10,
   },
@@ -1097,29 +1117,29 @@ controlBtnText: {
     justifyContent: "space-between",
     marginBottom: 6,
     backgroundColor: "#c5e9afff",
-    paddingHorizontal: 10,
+    paddingHorizontal: 2,
     paddingVertical: 4,
     borderRadius: 8,
     borderColor: "#2e06b3ff",
     borderWidth: 2,
   },
-teamTitle: {
-  fontSize: 18,
-  fontWeight: "bold",
-  color: "#2e06b3ff",
-},
-timerText: {
-  fontSize: 14,
-  color: "#e80b0bff",
-  fontWeight: "bold",
-  backgroundColor: "#9dbcbbff",
-  paddingHorizontal: 10,
-  paddingVertical: 2,
-  borderRadius: 4,
-},
+  teamTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2e06b3ff",
+  },
+  timerText: {
+    fontSize: 14,
+    color: "#e80b0bff",
+    fontWeight: "bold",
+    backgroundColor: "#9dbcbbff",
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
   btn: {
     backgroundColor: "#4CAF50",
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingVertical: 4,
     borderRadius: 5,
   },
@@ -1135,12 +1155,18 @@ timerText: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 4,
+    backgroundColor: "#f0f0f0",
+    
   },
   outBtn: {
     color: "red",
     fontWeight: "bold",
     fontSize: 12,
-  
+    borderWidth: 1,
+    borderColor: "red",
+    borderRadius: 4,
+    paddingHorizontal: 2,
+    
   },
   scoreBtnGroup: {
     flexWrap: "wrap",
@@ -1181,14 +1207,48 @@ timerText: {
     color: "#555",
     textAlign: "left",
     marginBottom: 4,
-  
   },
-  teamNames: {
+tossLabel: {
+  color: "#555",          // slightly dim for label
+  fontWeight: "500",
+},
+
+tossTeamName: {
+  color: "#555",          // darker for name
+  fontWeight: "500",
+  flexShrink: 1,
+},
+  teamName: {
     fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
     color: "#2e06b3ff",
   },
+  teamNamesRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 2,
+  flexWrap: "nowrap",
+  overflow: "hidden",
+},
+
+teamNameText: {
+  fontSize: 16,
+  fontWeight: "bold",
+  flexShrink: 1,
+  maxWidth: "40%",
+   color: "#2e06b3ff",
+  
+   // optional: prevent taking too much space
+},
+
+vsText: {
+  fontSize: 14,
+  color: "red",
+  marginHorizontal: 4,
+  fontWeight: "bold",
+},
   scoreRow: {
     fontSize: 24,
     fontWeight: "bold",
@@ -1202,14 +1262,16 @@ timerText: {
     right: 0,
     backgroundColor: "#c5e9afff",
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 2,
     borderBottomWidth: 2,
     borderColor: "#2e06b3ff",
     alignItems: "center",
     zIndex: 10,
+    height: 60,
+    justifyContent: "center",
   },
   stickyText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#2e06b3ff",
   },
