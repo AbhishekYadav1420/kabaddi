@@ -110,8 +110,7 @@ export default function ScoreScreen() {
   const disableDropdowns = !team1RaidRunning && !team2RaidRunning;
 
   const [showStickyHeader, setShowStickyHeader] = useState(false);
-const scrollOffsetY = useRef(0);
-
+  const scrollOffsetY = useRef(0);
 
   useEffect(() => {
     if (matchRunning) {
@@ -167,13 +166,83 @@ const scrollOffsetY = useRef(0);
     );
   }, [team1Players, team2Players]);
 
+  const endRaid = (teamNum: 1 | 2) => {
+    const isTeam1 = teamNum === 1;
+    const actions = isTeam1 ? team1RaidActions : team2RaidActions;
+    const dropdownVal = isTeam1 ? team1DropdownValue : team2DropdownValue;
+
+    // Current team logic (empty if no action)
+    if (dropdownVal && actions.length === 0) {
+      if (doOrDieTeam === teamNum) {
+        if (isTeam1) {
+          setTeam1EmptyRaidCount(0);
+          setDoOrDieTeam(null);
+        } else {
+          setTeam2EmptyRaidCount(0);
+          setDoOrDieTeam(null);
+        }
+      } else {
+        if (isTeam1) setTeam1PendingEmpty(true);
+        else setTeam2PendingEmpty(true);
+      }
+    }
+
+    // ❗DELAY opponent empty raid logic slightly so dropdown value/state updates fully
+    setTimeout(() => {
+      const opponentTeam = isTeam1 ? 2 : 1;
+      const isOpponentTeam1 = opponentTeam === 1;
+
+      const pendingEmpty = isOpponentTeam1
+        ? team1PendingEmpty
+        : team2PendingEmpty;
+      const setPendingEmpty = isOpponentTeam1
+        ? setTeam1PendingEmpty
+        : setTeam2PendingEmpty;
+      const setEmptyRaidCount = isOpponentTeam1
+        ? setTeam1EmptyRaidCount
+        : setTeam2EmptyRaidCount;
+      const dropdownValue = isOpponentTeam1
+        ? team1DropdownValue
+        : team2DropdownValue;
+      const players = isOpponentTeam1 ? team1Players : team2Players;
+      const setPlayers = isOpponentTeam1 ? setTeam1Players : setTeam2Players;
+
+      if (pendingEmpty) {
+        setEmptyRaidCount((prev) => {
+          if (prev === 2) {
+            const updated = [...players];
+            const idx = updated.findIndex((p) => p.name === dropdownValue);
+            if (idx !== -1) {
+              updated[idx].out = true;
+              setPlayers(updated);
+            }
+            return 0;
+          }
+          return prev + 1;
+        });
+        setPendingEmpty(false);
+      }
+    }, 0); // ← Changed from 100ms to 0ms and using updated state access
+
+    // Reset dropdowns
+    setTeam1DropdownValue(null);
+    setTeam2DropdownValue(null);
+
+    // Stop raid
+    if (isTeam1) setTeam1RaidRunning(false);
+    else setTeam2RaidRunning(false);
+  };
+
   useEffect(() => {
     if (team1RaidRunning) {
       team1RaidInterval.current = setInterval(() => {
         setTeam1RaidTimer((prev) => {
           if (prev === 1) {
             clearInterval(team1RaidInterval.current!);
-            setTeam1RaidRunning(false);
+
+            // ✅ Delay endRaid to ensure state is fresh
+            requestAnimationFrame(() => endRaid(1));
+
             return 30;
           }
           return prev - 1;
@@ -192,7 +261,9 @@ const scrollOffsetY = useRef(0);
         setTeam2RaidTimer((prev) => {
           if (prev === 1) {
             clearInterval(team2RaidInterval.current!);
-            setTeam2RaidRunning(false);
+
+            // ✅ Delay endRaid to ensure state is fresh
+            requestAnimationFrame(() => endRaid(2));
             return 30;
           }
           return prev - 1;
@@ -338,6 +409,10 @@ const scrollOffsetY = useRef(0);
       }
     };
 
+    const isDefending =
+      (teamNum === 1 && team2RaidRunning) ||
+      (teamNum === 2 && team1RaidRunning);
+
     const handleTackle = () => {
       const defendersIn = players.filter((p) => !p.out).length;
       const points = defendersIn <= 3 && isSuperTackleAllowed ? 2 : 1;
@@ -452,7 +527,6 @@ const scrollOffsetY = useRef(0);
                 }
 
                 // 🟠 Confirm if previous raid was empty and update count
-                // ✅ Check if the *opponent* has a pending empty raid before starting this team's raid
                 if (isTeam1 && team2PendingEmpty) {
                   setTeam2EmptyRaidCount((prev) => {
                     if (prev === 2) {
@@ -489,7 +563,6 @@ const scrollOffsetY = useRef(0);
                   setTeam1PendingEmpty(false);
                 }
 
-                // Clear raid actions for new raid
                 const setActions = isTeam1
                   ? setTeam1RaidActions
                   : setTeam2RaidActions;
@@ -505,11 +578,8 @@ const scrollOffsetY = useRef(0);
                 const dropdownVal =
                   teamNum === 1 ? team1DropdownValue : team2DropdownValue;
 
-                // 🟡 Mark this as a pending empty raid if no score happened
-                // 🟡 Mark this as a pending empty raid if no score happened
                 if (dropdownVal && actions.length === 0) {
                   if (doOrDieTeam === teamNum) {
-                    // If it was a Do-Or-Die raid and still empty → reset empty count
                     if (teamNum === 1) {
                       setTeam1EmptyRaidCount(0);
                       setDoOrDieTeam(null);
@@ -518,18 +588,28 @@ const scrollOffsetY = useRef(0);
                       setDoOrDieTeam(null);
                     }
                   } else {
-                    // Else: mark pending empty as usual
                     if (teamNum === 1) setTeam1PendingEmpty(true);
                     else setTeam2PendingEmpty(true);
                   }
                 }
 
-                // Reset dropdowns
                 setTeam1DropdownValue(null);
                 setTeam2DropdownValue(null);
               }
             }}
-            style={styles.btn}
+            disabled={
+              // 🔒 Disable if the other team is raiding
+              (teamNum === 1 && team2RaidRunning) ||
+              (teamNum === 2 && team1RaidRunning)
+            }
+            style={[
+              styles.btn,
+              ((teamNum === 1 && team2RaidRunning) ||
+                (teamNum === 2 && team1RaidRunning)) && {
+                backgroundColor: "gray",
+                opacity: 0.6,
+              },
+            ]}
           >
             <Text style={styles.btnText}>{raidRunning ? "End" : "Start"}</Text>
           </TouchableOpacity>
@@ -551,42 +631,61 @@ const scrollOffsetY = useRef(0);
           </View>
 
           <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
-            <DropDownPicker
-              open={dropdownOpen}
-              value={dropdownValue}
-              items={dropdownItems}
-              setOpen={setDropdownOpen}
-              setValue={(val) => {
-                setDropdownValue(val);
-                setShowDropdownWarning(false);
-              }}
-              setItems={setDropdownItems}
-              placeholder={
-                raidRunning
-                  ? showDropdownWarning && !dropdownValue
-                    ? "! Select Raider"
-                    : "Select Raider"
-                  : showDropdownWarning && !dropdownValue
-                  ? "! Select Defender"
-                  : "Select Defender"
-              }
-              placeholderStyle={{
-                color: showDropdownWarning && !dropdownValue ? "red" : "#000",
-                fontWeight:
-                  showDropdownWarning && !dropdownValue ? "bold" : "normal",
-              }}
-              containerStyle={{ marginBottom: 10 }}
-              style={{
-                borderColor:
-                  showDropdownWarning && !dropdownValue ? "red" : "#ccc",
-                borderWidth: 1,
-                opacity: disableDropdowns ? 0.5 : 1, // 👈 lowered opacity
-              }}
-              dropDownContainerStyle={{
-                opacity: disableDropdowns ? 0.5 : 1,
-              }}
-              disabled={disableDropdowns} // 👈 disables selection
-            />
+            <View style={{ zIndex: 2000 }}>
+              <DropDownPicker
+                open={dropdownOpen}
+                value={dropdownValue}
+                items={dropdownItems}
+                setOpen={setDropdownOpen}
+                setValue={(val) => {
+                  setDropdownValue(val);
+                  setShowDropdownWarning(false);
+                }}
+                setItems={setDropdownItems}
+                placeholder={
+                  raidRunning
+                    ? showDropdownWarning && !dropdownValue
+                      ? "! Select Raider"
+                      : "Select Raider"
+                    : showDropdownWarning && !dropdownValue
+                    ? "! Select Defender"
+                    : "Select Defender"
+                }
+                placeholderStyle={{
+                  color: showDropdownWarning && !dropdownValue ? "red" : "#000",
+                  fontWeight:
+                    showDropdownWarning && !dropdownValue ? "bold" : "normal",
+                }}
+                containerStyle={{ marginBottom: 10 }}
+                style={{
+                  borderColor:
+                    showDropdownWarning && !dropdownValue ? "red" : "#ccc",
+                  borderWidth: 1,
+                  opacity: disableDropdowns ? 0.5 : 1,
+                  paddingVertical: 4,
+                  minHeight: 36,
+                }}
+                dropDownContainerStyle={{
+                  maxHeight: 210,
+                  opacity: disableDropdowns ? 0.5 : 1,
+                  borderColor: "#ccc",
+                }}
+                listItemContainerStyle={{
+                  height: 25,
+                  justifyContent: "center",
+                }}
+                textStyle={{
+                  fontSize: 13,
+                }}
+                listMode="SCROLLVIEW"
+                scrollViewProps={{
+                  nestedScrollEnabled: true,
+                }}
+                zIndex={2000}
+                zIndexInverse={1000}
+                disabled={disableDropdowns}
+              />
+            </View>
 
             <View
               style={{
@@ -657,12 +756,11 @@ const scrollOffsetY = useRef(0);
                 })}
 
                 {/* ✅ Show 'Do-Or-Die Raid' text during raid */}
-               {doOrDieTeam === teamNum && raidRunning && (
-  <View style={styles.doOrDieContainer}>
-    <Text style={styles.doOrDieText}>Do-Or-Die</Text>
-  </View>
-)}
-
+                {doOrDieTeam === teamNum && raidRunning && (
+                  <View style={styles.doOrDieContainer}>
+                    <Text style={styles.doOrDieText}>Do-Or-Die</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -675,14 +773,16 @@ const scrollOffsetY = useRef(0);
                       onPress={() => handleScore(1)}
                       disabled={
                         !isBonusAllowed ||
-                        opponentPlayers.filter((p) => !p.out).length < 6
+                        opponentPlayers.filter((p) => !p.out).length < 6 ||
+                        isDefending
                       }
                       style={[
                         styles.scoreBtn,
                         {
                           backgroundColor:
                             !isBonusAllowed ||
-                            opponentPlayers.filter((p) => !p.out).length < 6
+                            opponentPlayers.filter((p) => !p.out).length < 6 ||
+                            isDefending
                               ? "gray"
                               : "#FF9800",
                         },
@@ -755,32 +855,32 @@ const scrollOffsetY = useRef(0);
 
   return (
     <View style={{ flex: 1 }}>
-    {showStickyHeader && (
-  <StickyScoreHeader
-    team1Name={team1Name}
-    team2Name={team2Name}
-    team1Score={team1Score}
-    team2Score={team2Score}
-  />
-)}
+      {showStickyHeader && (
+        <StickyScoreHeader
+          team1Name={team1Name}
+          team2Name={team2Name}
+          team1Score={team1Score}
+          team2Score={team2Score}
+        />
+      )}
 
-     <ScrollView
-  contentContainerStyle={styles.container}
-  scrollEventThrottle={16}
-  onScroll={(event) => {
-    const currentOffset = event.nativeEvent.contentOffset.y;
-    const direction = currentOffset < scrollOffsetY.current ? 'up' : 'down';
+      <ScrollView
+        contentContainerStyle={styles.container}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          const currentOffset = event.nativeEvent.contentOffset.y;
+          const direction =
+            currentOffset < scrollOffsetY.current ? "up" : "down";
 
-    if (direction === 'down' && currentOffset > 50) {
-      setShowStickyHeader(true);
-    } else {
-      setShowStickyHeader(false);
-    }
+          if (direction === "down" && currentOffset > 50) {
+            setShowStickyHeader(true);
+          } else {
+            setShowStickyHeader(false);
+          }
 
-    scrollOffsetY.current = currentOffset;
-  }}
->
-
+          scrollOffsetY.current = currentOffset;
+        }}
+      >
         <View
           style={{
             flexDirection: "row",
@@ -1091,21 +1191,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   doOrDieContainer: {
-  backgroundColor: "#fdecea",
-  paddingVertical: 2,
-  paddingHorizontal: 8,
-  borderRadius: 6,
-  alignItems: "flex-start",
+    backgroundColor: "#fdecea",
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    alignItems: "flex-start",
 
-  marginBottom: 6,
-  marginTop: 4,
-},
-doOrDieText: {
-  color: "#d32f2f",
-  fontWeight: "bold",
-  fontSize: 12,
-
-},
-
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  doOrDieText: {
+    color: "#d32f2f",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
 });
-
