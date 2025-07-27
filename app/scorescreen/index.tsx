@@ -1,5 +1,6 @@
+import { setMatchSummary } from '@/storedata/matchSummaryStore'; // ✅ adjust path if needed
 import { FontAwesome } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ScrollView,
@@ -124,6 +125,23 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
 
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const scrollOffsetY = useRef(0);
+
+
+  // Store stats per player
+const [team1PlayerStats, setTeam1PlayerStats] = useState<Record<string, PlayerStats>>({});
+const [team2PlayerStats, setTeam2PlayerStats] = useState<Record<string, PlayerStats>>({});
+
+// Store allout count
+const [team1Allouts, setTeam1Allouts] = useState(0);
+const [team2Allouts, setTeam2Allouts] = useState(0);
+
+type PlayerStats = {
+  name: string;
+  raidPoints: number;
+  defensePoints: number;
+  isOut: boolean;
+};
+
 
   useEffect(() => {
     if (matchRunning) {
@@ -289,6 +307,57 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
     return () => clearInterval(team2RaidInterval.current!);
   }, [team2RaidRunning]);
 
+
+const updatePlayerStats = (
+  team: "team1" | "team2",
+  playerName: string,
+  type: "raid" | "defense",
+  points: number
+) => {
+  const setStats = team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
+  const currentStats = team === "team1" ? team1PlayerStats : team2PlayerStats;
+
+  const prev = currentStats[playerName] || {
+    name: playerName,
+    raidPoints: 0,
+    defensePoints: 0,
+    isOut: false,
+  };
+
+  const updated = {
+    ...prev,
+    raidPoints: type === "raid" ? prev.raidPoints + points : prev.raidPoints,
+    defensePoints: type === "defense" ? prev.defensePoints + points : prev.defensePoints,
+  };
+
+  setStats((prev) => ({
+    ...prev,
+    [playerName]: updated,
+  }));
+};
+
+const setPlayerOutStatus = (
+  team: "team1" | "team2",
+  playerName: string,
+  isOut: boolean
+) => {
+  const setStats = team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
+  setStats((prev) => ({
+    ...prev,
+    [playerName]: {
+      ...(prev[playerName] || {
+        name: playerName,
+        raidPoints: 0,
+        defensePoints: 0,
+        isOut: false,
+      }),
+      isOut,
+    },
+  }));
+};
+
+
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
       .toString()
@@ -307,10 +376,38 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
     setGamePhase("second");
   };
 
-  const handleFullTime = () => {
-    setGamePhase("ended");
-    setMatchRunning(false);
+// ✅ only if using Expo Router
+
+const handleFullTime = () => {
+  setGamePhase("ended");
+  setMatchRunning(false);
+
+  const finalSummary = {
+    team1: {
+      name: team1Name,
+      score: team1Score,
+      allouts: team1Allouts, // ✅ make sure this is tracked during match
+      players: Object.values(team1PlayerStats), // ✅ format: { name, raidPoints, defensePoints, isOut }
+    },
+    team2: {
+      name: team2Name,
+      score: team2Score,
+      allouts: team2Allouts,
+      players: Object.values(team2PlayerStats),
+    },
+    winner:
+      team1Score > team2Score
+        ? team1Name
+        : team2Score > team1Score
+        ? team2Name
+        : "Tie",
   };
+
+  setMatchSummary(finalSummary);
+  router.push("/scorescreen/summary"); // ✅ update if your screen path differs
+};
+
+
 
   const StickyScoreHeader = ({
     team1Name,
@@ -605,29 +702,55 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
 
               // Reset dropdown selection when raid ends
               if (!newState) {
-                const actions =
-                  teamNum === 1 ? team1RaidActions : team2RaidActions;
-                const dropdownVal =
-                  teamNum === 1 ? team1DropdownValue : team2DropdownValue;
+  const actions = teamNum === 1 ? team1RaidActions : team2RaidActions;
+  const raiderName = teamNum === 1 ? team1DropdownValue : team2DropdownValue;
 
-                if (dropdownVal && actions.length === 0) {
-                  if (doOrDieTeam === teamNum) {
-                    if (teamNum === 1) {
-                      setTeam1EmptyRaidCount(0);
-                      setDoOrDieTeam(null);
-                    } else {
-                      setTeam2EmptyRaidCount(0);
-                      setDoOrDieTeam(null);
-                    }
-                  } else {
-                    if (teamNum === 1) setTeam1PendingEmpty(true);
-                    else setTeam2PendingEmpty(true);
-                  }
-                }
+  // 🟢 Update player stats from actions
+  actions.forEach((action) => {
+    const { type, player, points, out } = action;
 
-                setTeam1DropdownValue(null);
-                setTeam2DropdownValue(null);
-              }
+    if (type === "raid" && raiderName) {
+      updatePlayerStats(`team${teamNum}`, raiderName, "raid", points);
+    }
+
+    if (type === "defense") {
+      const defenderTeamNum = teamNum === 1 ? 2 : 1;
+      updatePlayerStats(`team${defenderTeamNum}`, player, "defense", points);
+    }
+
+    if (out) {
+      const outTeam = (type === "defense"
+  ? `team${teamNum}`
+  : `team${teamNum === 1 ? 2 : 1}`) as "team1" | "team2";
+
+setPlayerOutStatus(outTeam, player, true);
+
+    }
+  });
+
+  // 🟠 Handle Do-Or-Die and empty raid fallback
+  if (raiderName && actions.length === 0) {
+    if (doOrDieTeam === teamNum) {
+      // Reset empty raid count if this was Do-or-Die
+      if (teamNum === 1) {
+        setTeam1EmptyRaidCount(0);
+        setDoOrDieTeam(null);
+      } else {
+        setTeam2EmptyRaidCount(0);
+        setDoOrDieTeam(null);
+      }
+    } else {
+      // Mark pending empty raid
+      if (teamNum === 1) setTeam1PendingEmpty(true);
+      else setTeam2PendingEmpty(true);
+    }
+  }
+
+  // 🔻 Reset dropdown selections
+  setTeam1DropdownValue(null);
+  setTeam2DropdownValue(null);
+}
+
             }}
             disabled={
               // 🔒 Disable if the other team is raiding
@@ -1060,9 +1183,19 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
                 </View>
               </>
             ) : (
-              <Text style={{ fontSize: 22, fontWeight: "bold", color: "red" }}>
-                Match Over!
-              </Text>
+              <View style={{ alignItems: "center" }}>
+  <Text style={{ fontSize: 22, fontWeight: "bold", color: "red", marginBottom: 6 }}>
+    Match Over!
+  </Text>
+  <Text style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>
+    {team1Score > team2Score
+      ? `Winner: ${team1Name}`
+      : team2Score > team1Score
+      ? `Winner: ${team2Name}`
+      : "Match Tied"}
+  </Text>
+</View>
+
             )}
           </View>
         </View>
