@@ -131,12 +131,20 @@ const [team2RaidPoints, setTeam2RaidPoints] = useState(0);
 const [team1TacklePoints, setTeam1TacklePoints] = useState(0);
 const [team2TacklePoints, setTeam2TacklePoints] = useState(0);
 
+const [team1AlloutScore, setTeam1AlloutScore] = useState(0);
+const [team2AlloutScore, setTeam2AlloutScore] = useState(0);
+
+
 
 // Store allout count
 const [team1Allouts, setTeam1Allouts] = useState(0);
 const [team2Allouts, setTeam2Allouts] = useState(0);
 const [team1PlayerStats, setTeam1PlayerStats] = useState<PlayerStatsMap>({});
 const [team2PlayerStats, setTeam2PlayerStats] = useState<PlayerStatsMap>({});
+
+const [teamNum, setTeamNum] = useState<1 | 2>(1); // current team's turn
+
+
 
 type PlayerStat = {
   name: string;
@@ -386,6 +394,10 @@ const setPlayerOutStatus = (
 
 
 const handleFullTime = () => {
+
+  
+  console.log("Final Allouts => Team 1:", team1Allouts, "Team 2:", team2Allouts);
+
   setGamePhase("ended");
   setMatchRunning(false);
 
@@ -400,17 +412,15 @@ const handleFullTime = () => {
       };
     });
 
-      const countAllouts = (actions: { type: string; value?: number }[]) =>
-    actions.filter((a) => a.type === "score" && a.value === 2).length;
-
   const finalSummary = {
     team1: {
       name: team1Name,
       score: team1Score,
+      allout: team1Allouts,
       points: {
         raid: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
         tackle: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
-        allout: countAllouts(team2RaidActions),
+        allout: team1Allouts,
         extra: 0,
       },
       players: formatPlayers(team1Players.map(p => p.name), team1PlayerStats),
@@ -419,10 +429,11 @@ const handleFullTime = () => {
     team2: {
       name: team2Name,
       score: team2Score,
+      allout: team2Allouts,
       points: {
         raid: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
         tackle: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
-        allout: countAllouts(team1RaidActions),
+        allout: team2Allouts,
         extra: 0,
       },
       players: formatPlayers(team2Players.map(p => p.name), team2PlayerStats),
@@ -472,40 +483,71 @@ const handleFullTime = () => {
     
   );
 
-  const handleOut = (team: 1 | 2, index: number) => {
-    const current = team === 1 ? [...team1Players] : [...team2Players];
-    if (current[index].out) return;
-    current[index].out = true;
+// function handleOut(team: 1 | 2, index: number) {
+//   const currentPlayers = team === 1 ? [...team1Players] : [...team2Players];
+//   const setCurrentPlayers = team === 1 ? setTeam1Players : setTeam2Players;
 
-    const setCurrent = team === 1 ? setTeam1Players : setTeam2Players;
-    const getOpponent = team === 1 ? [...team2Players] : [...team1Players];
-    const setOpponent = team === 1 ? setTeam2Players : setTeam1Players;
+//   // Skip if already out
+//   if (currentPlayers[index].out) return;
 
-    setCurrent(current);
+//   // Mark the player out
+//   currentPlayers[index].out = true;
+//   setCurrentPlayers(currentPlayers);
 
-    const actionStack = team === 1 ? team1RaidActions : team2RaidActions;
-    const setActionStack =
-      team === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-    setActionStack([...actionStack, { type: "out", index }]);
+//   const opponentPlayers = team === 1 ? [...team2Players] : [...team1Players];
+//   const setOpponentPlayers = team === 1 ? setTeam2Players : setTeam1Players;
 
-    const reviveIndex = getOpponent.findIndex((p) => p.out);
-    if (reviveIndex !== -1) {
-      getOpponent[reviveIndex].out = false;
-      setOpponent(getOpponent);
-      setActionStack((prev) => [
-        ...prev,
-        { type: "revive", index: reviveIndex },
-      ]);
-    }
+//   const actionStack = team === 1 ? team1RaidActions : team2RaidActions;
+//   const setActionStack = team === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+//   setActionStack([...actionStack, { type: "out", index }]);
 
-    if (current.every((p) => p.out)) {
-      const revived = current.map((p) => ({ ...p, out: false }));
-      setCurrent(revived);
-      const setScore = team === 1 ? setTeam2Score : setTeam1Score;
-      setScore((s) => s + 2);
-      setActionStack((prev) => [...prev, { type: "score", value: 2 }]);
-    }
-  };
+//   // Revive a player from opponent if any are out
+//   const reviveIndex = opponentPlayers.findIndex((p) => p.out);
+//   if (reviveIndex !== -1) {
+//     opponentPlayers[reviveIndex].out = false;
+//     setOpponentPlayers(opponentPlayers);
+
+//     const setOpponentActionStack = team === 1 ? setTeam2RaidActions : setTeam1RaidActions;
+//     setOpponentActionStack((prev) => [
+//       ...prev,
+//       { type: "revive", index: reviveIndex },
+//     ]);
+//   }
+
+// if (currentPlayers.every((p) => p.out)) {
+//   console.log("✅ All-out triggered for team", team);
+
+//   const revivedTeam = currentPlayers.map((p) => ({ ...p, out: false }));
+//   setCurrentPlayers(revivedTeam);
+
+//   if (team === 1) {
+//     setTeam2Score((s) => {
+//       console.log("Team 2 score before:", s);
+//       return s + 2;
+//     });
+
+//     setTeam2Allouts((prev) => {
+//       console.log("Team 2 Allouts before:", prev);
+//       return prev + 1;
+//     });
+//   } else {
+//     setTeam1Score((s) => {
+//       console.log("Team 1 score before:", s);
+//       return s + 2;
+//     });
+
+//     setTeam1Allouts((prev) => {
+//       console.log("Team 1 Allouts before:", prev);
+//       return prev + 1;
+//     });
+//   }
+// } else {
+//   console.log("⛔ Not all players are out for team", team);
+// }
+
+// }
+
+
   const renderTeamSection = (
     teamNum: 1 | 2,
     teamName: string,
@@ -524,7 +566,7 @@ const handleFullTime = () => {
     setDropdownItems: any[],
     opponentPlayers: PlayerStatus[]
   ) => {
-    const handleScore = (pts: number) => {
+const handleScore = (pts: number) => {
   const isFoul =
     (teamNum === 1 && team1FoulChecked) ||
     (teamNum === 2 && team2FoulChecked);
@@ -534,19 +576,39 @@ const handleFullTime = () => {
     return;
   }
 
-  setShowDropdownWarning(false); // clear warning once selected
+  setShowDropdownWarning(false);
   setScore((prev) => prev + pts);
+
+  // ✅ Trigger OUT logic — only when not foul
+  if (!isFoul && dropdownValue) {
+    const outTeam =
+      teamNum === 1
+        ? team1RaidRunning
+          ? 2 // team 1 is raiding → team 2 defender is out
+          : 1 // team 1 is defending → team 1 raider is out
+        : team2RaidRunning
+        ? 1 // team 2 is raiding → team 1 defender is out
+        : 2; // team 2 is defending → team 2 raider is out
+
+    const players = outTeam === 1 ? team1Players : team2Players;
+    const outIndex = players.findIndex((p) => p.name === dropdownValue);
+
+    if (outIndex !== -1) {
+      handleOut(outTeam, outIndex); // ✅ This ensures the function is actually used
+    }
+  }
 
   const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
   const setActionStack =
     teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-  setActionStack([...actionStack, { type: "score", value: pts }]);
+  setActionStack((prev) => [...prev, { type: "score", value: pts }]);
 
+  // ✅ Detect if current team is raiding
   const isRaiding =
     (teamNum === 1 && team1RaidRunning) ||
     (teamNum === 2 && team2RaidRunning);
 
-  // 💡 Empty raid reset
+  // ✅ Reset empty raid counter
   if (isRaiding) {
     if (teamNum === 1) {
       setTeam1EmptyRaidCount(0);
@@ -557,7 +619,7 @@ const handleFullTime = () => {
     }
   }
 
-  // ✅ Update team-specific raid/tackle/player stats
+  // ✅ Update stats
   if (teamNum === 1) {
     if (isFoul) {
       setTeam1FoulChecked(false);
@@ -653,13 +715,19 @@ const handleFullTime = () => {
         ]);
       }
 
-      if (current.every((p) => p.out)) {
-        const revived = current.map((p) => ({ ...p, out: false }));
-        setCurrent(revived);
-        const setScore = team === 1 ? setTeam2Score : setTeam1Score;
-        setScore((s) => s + 2);
-        setActionStack((prev) => [...prev, { type: "score", value: 2 }]);
-      }
+  if (current.every((p) => p.out)) {
+  const revived = current.map((p) => ({ ...p, out: false }));
+  setCurrent(revived);
+
+  if (team === 1) {
+    setTeam2Score((s) => s + 2);
+    setTeam2Allouts((prev) => prev + 2);
+  } else {
+    setTeam1Score((s) => s + 2);
+    setTeam1Allouts((prev) => prev + 2);
+  }
+}
+
     };
 
     const handleUndo = () => {
