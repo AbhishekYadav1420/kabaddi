@@ -71,6 +71,14 @@ export default function MatchSummary() {
 
       <Text style={styles.subHeader}>{team2.name}</Text>
       {renderPlayerStats(team2.players)}
+
+       <View style={styles.statRow}>
+        <Text style={styles.statCell}>Player</Text>
+        <Text style={styles.statCell}>Raid Point</Text>
+        <Text style={styles.statCell}>Tackle Point</Text>
+          <Text style={styles.statCell}>Extras</Text>
+        <Text style={styles.statCell}>Total Point</Text>
+      </View>
     </ScrollView>
   );
 }

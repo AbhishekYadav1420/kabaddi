@@ -126,21 +126,30 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const scrollOffsetY = useRef(0);
 
+  const [team1RaidPoints, setTeam1RaidPoints] = useState(0);
+const [team2RaidPoints, setTeam2RaidPoints] = useState(0);
+const [team1TacklePoints, setTeam1TacklePoints] = useState(0);
+const [team2TacklePoints, setTeam2TacklePoints] = useState(0);
 
-  // Store stats per player
-const [team1PlayerStats, setTeam1PlayerStats] = useState<Record<string, PlayerStats>>({});
-const [team2PlayerStats, setTeam2PlayerStats] = useState<Record<string, PlayerStats>>({});
 
 // Store allout count
 const [team1Allouts, setTeam1Allouts] = useState(0);
 const [team2Allouts, setTeam2Allouts] = useState(0);
+const [team1PlayerStats, setTeam1PlayerStats] = useState<PlayerStatsMap>({});
+const [team2PlayerStats, setTeam2PlayerStats] = useState<PlayerStatsMap>({});
 
-type PlayerStats = {
+type PlayerStat = {
   name: string;
   raidPoints: number;
   defensePoints: number;
   isOut: boolean;
 };
+
+// Map of player name to stats
+type PlayerStatsMap = {
+  [playerName: string]: PlayerStat;
+};
+
 
 
   useEffect(() => {
@@ -357,7 +366,6 @@ const setPlayerOutStatus = (
 };
 
 
-
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
       .toString()
@@ -376,24 +384,49 @@ const setPlayerOutStatus = (
     setGamePhase("second");
   };
 
-// ✅ only if using Expo Router
 
 const handleFullTime = () => {
   setGamePhase("ended");
   setMatchRunning(false);
 
+  const formatPlayers = (playerNames: string[], stats: Record<string, any>) =>
+    playerNames.map((name) => {
+      const p = stats[name] || {};
+      return {
+        name,
+        raid: p.raidPoints || 0,
+        tackle: p.defensePoints || 0,
+        extra: 0,
+      };
+    });
+
+      const countAllouts = (actions: { type: string; value?: number }[]) =>
+    actions.filter((a) => a.type === "score" && a.value === 2).length;
+
   const finalSummary = {
     team1: {
       name: team1Name,
       score: team1Score,
-      allouts: team1Allouts, // ✅ make sure this is tracked during match
-      players: Object.values(team1PlayerStats), // ✅ format: { name, raidPoints, defensePoints, isOut }
+      points: {
+        raid: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
+        tackle: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
+        allout: countAllouts(team2RaidActions),
+        extra: 0,
+      },
+      players: formatPlayers(team1Players.map(p => p.name), team1PlayerStats),
+ // <- use full list
     },
     team2: {
       name: team2Name,
       score: team2Score,
-      allouts: team2Allouts,
-      players: Object.values(team2PlayerStats),
+      points: {
+        raid: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
+        tackle: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
+        allout: countAllouts(team1RaidActions),
+        extra: 0,
+      },
+      players: formatPlayers(team2Players.map(p => p.name), team2PlayerStats),
+
     },
     winner:
       team1Score > team2Score
@@ -404,7 +437,7 @@ const handleFullTime = () => {
   };
 
   setMatchSummary(finalSummary);
-  router.push("/scorescreen/summary"); // ✅ update if your screen path differs
+  router.push("/scorescreen/summary");
 };
 
 
@@ -492,43 +525,90 @@ const handleFullTime = () => {
     opponentPlayers: PlayerStatus[]
   ) => {
     const handleScore = (pts: number) => {
-      const isFoul =
-        (teamNum === 1 && team1FoulChecked) ||
-        (teamNum === 2 && team2FoulChecked);
+  const isFoul =
+    (teamNum === 1 && team1FoulChecked) ||
+    (teamNum === 2 && team2FoulChecked);
 
-      if (!isFoul && !dropdownValue) {
-        setShowDropdownWarning(true);
-        return;
-      }
+  if (!isFoul && !dropdownValue) {
+    setShowDropdownWarning(true);
+    return;
+  }
 
-      setShowDropdownWarning(false); // clear warning once selected
+  setShowDropdownWarning(false); // clear warning once selected
+  setScore((prev) => prev + pts);
 
-      setScore((prev) => prev + pts);
+  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+  const setActionStack =
+    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+  setActionStack([...actionStack, { type: "score", value: pts }]);
 
-      const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-      const setActionStack =
-        teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-      setActionStack([...actionStack, { type: "score", value: pts }]);
+  const isRaiding =
+    (teamNum === 1 && team1RaidRunning) ||
+    (teamNum === 2 && team2RaidRunning);
 
-      const isRaiding =
-        (teamNum === 1 && team1RaidRunning) ||
-        (teamNum === 2 && team2RaidRunning);
+  // 💡 Empty raid reset
+  if (isRaiding) {
+    if (teamNum === 1) {
+      setTeam1EmptyRaidCount(0);
+      setTeam1PendingEmpty(false);
+    } else {
+      setTeam2EmptyRaidCount(0);
+      setTeam2PendingEmpty(false);
+    }
+  }
 
-      if (isRaiding) {
-        if (teamNum === 1) {
-          setTeam1EmptyRaidCount(0);
-          setTeam1PendingEmpty(false);
-        } else {
-          setTeam2EmptyRaidCount(0);
-          setTeam2PendingEmpty(false);
-        }
-      }
+  // ✅ Update team-specific raid/tackle/player stats
+  if (teamNum === 1) {
+    if (isFoul) {
+      setTeam1FoulChecked(false);
+    } else if (team1RaidRunning && dropdownValue) {
+      // Raider from team 1
+      setTeam1RaidPoints((prev) => prev + pts);
+      setTeam1PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+        },
+      }));
+    } else if (!team1RaidRunning && dropdownValue) {
+      // Defender from team 1
+      setTeam1TacklePoints((prev) => prev + pts);
+      setTeam1PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+        },
+      }));
+    }
+  } else if (teamNum === 2) {
+    if (isFoul) {
+      setTeam2FoulChecked(false);
+    } else if (team2RaidRunning && dropdownValue) {
+      // Raider from team 2
+      setTeam2RaidPoints((prev) => prev + pts);
+      setTeam2PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+        },
+      }));
+    } else if (!team2RaidRunning && dropdownValue) {
+      // Defender from team 2
+      setTeam2TacklePoints((prev) => prev + pts);
+      setTeam2PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+        },
+      }));
+    }
+  }
+};
 
-      // Reset foul
-      if (isFoul) {
-        teamNum === 1 ? setTeam1FoulChecked(false) : setTeam2FoulChecked(false);
-      }
-    };
 
     const isDefending =
       (teamNum === 1 && team2RaidRunning) ||
