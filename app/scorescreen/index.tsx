@@ -1,8 +1,14 @@
-import { setMatchSummary } from '@/storedata/matchSummaryStore'; // ✅ adjust path if needed
+import { setMatchSummary } from "@/storedata/matchSummaryStore"; // ✅ adjust path if needed
 import { FontAwesome } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
+import Toast from 'react-native-root-toast';
+
+
+
+
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -47,19 +53,20 @@ export default function ScoreScreen() {
     return minutes * 60 + seconds;
   })();
 
-const truncateName = (name: string, maxLength = 14) =>
-  name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
+  const truncateName = (name: string, maxLength = 14) =>
+    name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
 
-const displayedTeam1Name = truncateName(team1Name);
-const displayedTeam2Name = truncateName(team2Name);
+  const displayedTeam1Name = truncateName(team1Name);
+  const displayedTeam2Name = truncateName(team2Name);
 
-// Choose a fixed width per name based on the longest truncated name
-const charWidth = 9; // adjust based on font size
-const longestTruncatedLength = Math.max(displayedTeam1Name.length, displayedTeam2Name.length);
-const nameWidth = longestTruncatedLength * charWidth;
-const nameBlockWidth = longestTruncatedLength * charWidth;
-
-
+  // Choose a fixed width per name based on the longest truncated name
+  const charWidth = 9; // adjust based on font size
+  const longestTruncatedLength = Math.max(
+    displayedTeam1Name.length,
+    displayedTeam2Name.length
+  );
+  const nameWidth = longestTruncatedLength * charWidth;
+  const nameBlockWidth = longestTruncatedLength * charWidth;
 
   const initialTeam1Players: PlayerStatus[] = JSON.parse(
     playersTeam1 || "[]"
@@ -127,71 +134,66 @@ const nameBlockWidth = longestTruncatedLength * charWidth;
   const scrollOffsetY = useRef(0);
 
   const [team1RaidPoints, setTeam1RaidPoints] = useState(0);
-const [team2RaidPoints, setTeam2RaidPoints] = useState(0);
-const [team1TacklePoints, setTeam1TacklePoints] = useState(0);
-const [team2TacklePoints, setTeam2TacklePoints] = useState(0);
+  const [team2RaidPoints, setTeam2RaidPoints] = useState(0);
+  const [team1TacklePoints, setTeam1TacklePoints] = useState(0);
+  const [team2TacklePoints, setTeam2TacklePoints] = useState(0);
 
-const [team1AlloutScore, setTeam1AlloutScore] = useState(0);
-const [team2AlloutScore, setTeam2AlloutScore] = useState(0);
+  const [team1AlloutScore, setTeam1AlloutScore] = useState(0);
+  const [team2AlloutScore, setTeam2AlloutScore] = useState(0);
 
+  // Store allout count
+  const [team1Allouts, setTeam1Allouts] = useState(0);
+  const [team2Allouts, setTeam2Allouts] = useState(0);
+  const [team1PlayerStats, setTeam1PlayerStats] = useState<PlayerStatsMap>({});
+  const [team2PlayerStats, setTeam2PlayerStats] = useState<PlayerStatsMap>({});
+  const [mainTimeOverWhileRaid, setMainTimeOverWhileRaid] = useState(false);
 
-
-// Store allout count
-const [team1Allouts, setTeam1Allouts] = useState(0);
-const [team2Allouts, setTeam2Allouts] = useState(0);
-const [team1PlayerStats, setTeam1PlayerStats] = useState<PlayerStatsMap>({});
-const [team2PlayerStats, setTeam2PlayerStats] = useState<PlayerStatsMap>({});
-const [mainTimeOverWhileRaid, setMainTimeOverWhileRaid] = useState(false);
-
-
-const [teamNum, setTeamNum] = useState<1 | 2>(1); // current team's turn
+  const [backPressCount, setBackPressCount] = useState(0);
+const backPressTimer = useRef<NodeJS.Timeout | null>(null);
 
 
+  const [teamNum, setTeamNum] = useState<1 | 2>(1); // current team's turn
 
-type PlayerStat = {
-  name: string;
-  raidPoints: number;
-  defensePoints: number;
-  isOut: boolean;
-};
-
-// Map of player name to stats
-type PlayerStatsMap = {
-  [playerName: string]: PlayerStat;
-};
-
-
-useEffect(() => {
-  if (matchRunning) {
-    matchInterval.current = setInterval(() => {
-      setMatchTimer((prev) => {
-        if (prev === 1) {
-          clearInterval(matchInterval.current!);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  } else {
-    if (matchInterval.current) clearInterval(matchInterval.current);
-  }
-  return () => {
-    if (matchInterval.current) clearInterval(matchInterval.current);
+  type PlayerStat = {
+    name: string;
+    raidPoints: number;
+    defensePoints: number;
+    isOut: boolean;
   };
-}, [matchRunning]);
 
-
+  // Map of player name to stats
+  type PlayerStatsMap = {
+    [playerName: string]: PlayerStat;
+  };
 
   useEffect(() => {
-  if (matchTimer === 0) {
-    if (team1RaidRunning || team2RaidRunning) {
-      setMainTimeOverWhileRaid(true); // ⏱️ Defer stopping
+    if (matchRunning) {
+      matchInterval.current = setInterval(() => {
+        setMatchTimer((prev) => {
+          if (prev === 1) {
+            clearInterval(matchInterval.current!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } else {
-      setMatchRunning(false); // ❌ Stop immediately
+      if (matchInterval.current) clearInterval(matchInterval.current);
     }
-  }
-}, [matchTimer, team1RaidRunning, team2RaidRunning]);
+    return () => {
+      if (matchInterval.current) clearInterval(matchInterval.current);
+    };
+  }, [matchRunning]);
 
+  useEffect(() => {
+    if (matchTimer === 0) {
+      if (team1RaidRunning || team2RaidRunning) {
+        setMainTimeOverWhileRaid(true); // ⏱️ Defer stopping
+      } else {
+        setMatchRunning(false); // ❌ Stop immediately
+      }
+    }
+  }, [matchTimer, team1RaidRunning, team2RaidRunning]);
 
   useEffect(() => {
     if (timeoutRunning) {
@@ -293,118 +295,139 @@ useEffect(() => {
     if (isTeam1) setTeam1RaidRunning(false);
     else setTeam2RaidRunning(false);
   };
-useEffect(() => {
-  if (team1RaidRunning) {
-    team1RaidInterval.current = setInterval(() => {
-      setTeam1RaidTimer((prev) => {
-        if (prev === 1) {
-          clearInterval(team1RaidInterval.current!);
+  useEffect(() => {
+    if (team1RaidRunning) {
+      team1RaidInterval.current = setInterval(() => {
+        setTeam1RaidTimer((prev) => {
+          if (prev === 1) {
+            clearInterval(team1RaidInterval.current!);
 
-          // ✅ Delay endRaid to ensure state is fresh
-          requestAnimationFrame(() => {
-            endRaid(1);
+            // ✅ Delay endRaid to ensure state is fresh
+            requestAnimationFrame(() => {
+              endRaid(1);
 
-            // ✅ Stop main timer if needed
-            if (mainTimeOverWhileRaid) {
-              setMatchRunning(false);
-              setMainTimeOverWhileRaid(false);
-            }
-          });
+              // ✅ Stop main timer if needed
+              if (mainTimeOverWhileRaid) {
+                setMatchRunning(false);
+                setMainTimeOverWhileRaid(false);
+              }
+            });
 
-          return 30;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  } else {
-    clearInterval(team1RaidInterval.current!);
-    setTeam1RaidTimer(30);
-  }
+            return 30;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(team1RaidInterval.current!);
+      setTeam1RaidTimer(30);
+    }
 
-  return () => clearInterval(team1RaidInterval.current!);
-}, [team1RaidRunning]);
+    return () => clearInterval(team1RaidInterval.current!);
+  }, [team1RaidRunning]);
 
+  useEffect(() => {
+    if (team2RaidRunning) {
+      team2RaidInterval.current = setInterval(() => {
+        setTeam2RaidTimer((prev) => {
+          if (prev === 1) {
+            clearInterval(team2RaidInterval.current!);
 
-useEffect(() => {
-  if (team2RaidRunning) {
-    team2RaidInterval.current = setInterval(() => {
-      setTeam2RaidTimer((prev) => {
-        if (prev === 1) {
-          clearInterval(team2RaidInterval.current!);
+            // ✅ Delay endRaid to ensure state is fresh
+            requestAnimationFrame(() => {
+              endRaid(2);
 
-          // ✅ Delay endRaid to ensure state is fresh
-          requestAnimationFrame(() => {
-            endRaid(2);
+              // ✅ Stop main timer if needed
+              if (mainTimeOverWhileRaid) {
+                setMatchRunning(false);
+                setMainTimeOverWhileRaid(false);
+              }
+            });
 
-            // ✅ Stop main timer if needed
-            if (mainTimeOverWhileRaid) {
-              setMatchRunning(false);
-              setMainTimeOverWhileRaid(false);
-            }
-          });
+            return 30;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(team2RaidInterval.current!);
+      setTeam2RaidTimer(30);
+    }
 
-          return 30;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  } else {
-    clearInterval(team2RaidInterval.current!);
-    setTeam2RaidTimer(30);
-  }
+    return () => clearInterval(team2RaidInterval.current!);
+  }, [team2RaidRunning]);
 
-  return () => clearInterval(team2RaidInterval.current!);
-}, [team2RaidRunning]);
+  const updatePlayerStats = (
+    team: "team1" | "team2",
+    playerName: string,
+    type: "raid" | "defense",
+    points: number
+  ) => {
+    const setStats =
+      team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
+    const currentStats = team === "team1" ? team1PlayerStats : team2PlayerStats;
 
+    const prev = currentStats[playerName] || {
+      name: playerName,
+      raidPoints: 0,
+      defensePoints: 0,
+      isOut: false,
+    };
 
+    const updated = {
+      ...prev,
+      raidPoints: type === "raid" ? prev.raidPoints + points : prev.raidPoints,
+      defensePoints:
+        type === "defense" ? prev.defensePoints + points : prev.defensePoints,
+    };
 
-const updatePlayerStats = (
-  team: "team1" | "team2",
-  playerName: string,
-  type: "raid" | "defense",
-  points: number
-) => {
-  const setStats = team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
-  const currentStats = team === "team1" ? team1PlayerStats : team2PlayerStats;
-
-  const prev = currentStats[playerName] || {
-    name: playerName,
-    raidPoints: 0,
-    defensePoints: 0,
-    isOut: false,
+    setStats((prev) => ({
+      ...prev,
+      [playerName]: updated,
+    }));
   };
 
-  const updated = {
-    ...prev,
-    raidPoints: type === "raid" ? prev.raidPoints + points : prev.raidPoints,
-    defensePoints: type === "defense" ? prev.defensePoints + points : prev.defensePoints,
+  const setPlayerOutStatus = (
+    team: "team1" | "team2",
+    playerName: string,
+    isOut: boolean
+  ) => {
+    const setStats =
+      team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
+    setStats((prev) => ({
+      ...prev,
+      [playerName]: {
+        ...(prev[playerName] || {
+          name: playerName,
+          raidPoints: 0,
+          defensePoints: 0,
+          isOut: false,
+        }),
+        isOut,
+      },
+    }));
   };
 
-  setStats((prev) => ({
-    ...prev,
-    [playerName]: updated,
-  }));
+
+const router = useRouter();
+const handleDoubleBack = () => {
+  if (backPressCount === 0) {
+    setBackPressCount(1);
+
+    Toast.show('Press again to go back', {
+      duration: Toast.durations.SHORT,
+      position: Toast.positions.BOTTOM,
+    });
+
+    backPressTimer.current = setTimeout(() => {
+      setBackPressCount(0);
+    }, 2000);
+  } else {
+    router.push('/');
+  }
 };
 
-const setPlayerOutStatus = (
-  team: "team1" | "team2",
-  playerName: string,
-  isOut: boolean
-) => {
-  const setStats = team === "team1" ? setTeam1PlayerStats : setTeam2PlayerStats;
-  setStats((prev) => ({
-    ...prev,
-    [playerName]: {
-      ...(prev[playerName] || {
-        name: playerName,
-        raidPoints: 0,
-        defensePoints: 0,
-        isOut: false,
-      }),
-      isOut,
-    },
-  }));
-};
+
 
 
   const formatTime = (s: number) => {
@@ -425,94 +448,149 @@ const setPlayerOutStatus = (
     setGamePhase("second");
   };
 
-
-const handleFullTime = () => {
-
-  
-  console.log("Final Allouts => Team 1:", team1Allouts, "Team 2:", team2Allouts);
-
-  setGamePhase("ended");
-  setMatchRunning(false);
-
-  const formatPlayers = (playerNames: string[], stats: Record<string, any>) =>
-    playerNames.map((name) => {
-      const p = stats[name] || {};
-      return {
-        name,
-        raid: p.raidPoints || 0,
-        tackle: p.defensePoints || 0,
-        extra: 0,
-      };
-    });
-
-  const finalSummary = {
-    team1: {
-      name: team1Name,
-      score: team1Score,
-      allout: team1Allouts,
-      points: {
-        raid: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
-        tackle: Object.values(team1PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
-        allout: team1Allouts,
-        extra: 0,
-      },
-      players: formatPlayers(team1Players.map(p => p.name), team1PlayerStats),
- // <- use full list
-    },
-    team2: {
-      name: team2Name,
-      score: team2Score,
-      allout: team2Allouts,
-      points: {
-        raid: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.raidPoints || 0), 0),
-        tackle: Object.values(team2PlayerStats).reduce((sum, p) => sum + (p.defensePoints || 0), 0),
-        allout: team2Allouts,
-        extra: 0,
-      },
-      players: formatPlayers(team2Players.map(p => p.name), team2PlayerStats),
-
-    },
-    winner:
-      team1Score > team2Score
-        ? team1Name
-        : team2Score > team1Score
-        ? team2Name
-        : "Tie",
+  const handleFullTime = () => {
+    setGamePhase("ended");
+    setMatchRunning(false);
   };
 
-  setMatchSummary(finalSummary);
-  router.push("/scorescreen/summary");
-};
+  const generateMatchSummary = () => {
+    console.log(
+      "Current Allouts => Team 1:",
+      team1Allouts,
+      "Team 2:",
+      team2Allouts
+    );
 
-  const StickyScoreHeader = ({
-    team1Name,
-    team2Name,
-    team1Score,
-    team2Score,
-  }: {
-    team1Name: string;
-    team2Name: string;
-    team1Score: number;
-    team2Score: number;
-  }) => (
-    <View style={styles.stickyHeader}>
- <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", padding: 4 }}>
-  <Text style={[styles.stickyText,{width: nameWidth,textAlign: "center",fontWeight: "bold",overflow: "hidden",},]}numberOfLines={1}ellipsizeMode="tail">
-    {displayedTeam1Name}
-  </Text>
+    const formatPlayers = (playerNames: string[], stats: Record<string, any>) =>
+      playerNames.map((name) => {
+        const p = stats[name] || {};
+        return {
+          name,
+          raid: p.raidPoints || 0,
+          tackle: p.defensePoints || 0,
+          extra: 0,
+        };
+      });
 
-  <Text style={[styles.stickyText,{marginHorizontal: 4,fontWeight: "bold",},]}>
-    {team1Score.toString().padStart(2, "0")} : {team2Score.toString().padStart(2, "0")}
-  </Text>
+    const liveSummary = {
+      team1: {
+        name: team1Name,
+        score: team1Score,
+        allout: team1Allouts,
+        points: {
+          raid: Object.values(team1PlayerStats).reduce(
+            (sum, p) => sum + (p.raidPoints || 0),
+            0
+          ),
+          tackle: Object.values(team1PlayerStats).reduce(
+            (sum, p) => sum + (p.defensePoints || 0),
+            0
+          ),
+          allout: team1Allouts,
+          extra: 0,
+        },
+        players: formatPlayers(
+          team1Players.map((p) => p.name),
+          team1PlayerStats
+        ),
+      },
+      team2: {
+        name: team2Name,
+        score: team2Score,
+        allout: team2Allouts,
+        points: {
+          raid: Object.values(team2PlayerStats).reduce(
+            (sum, p) => sum + (p.raidPoints || 0),
+            0
+          ),
+          tackle: Object.values(team2PlayerStats).reduce(
+            (sum, p) => sum + (p.defensePoints || 0),
+            0
+          ),
+          allout: team2Allouts,
+          extra: 0,
+        },
+        players: formatPlayers(
+          team2Players.map((p) => p.name),
+          team2PlayerStats
+        ),
+      },
+      winner:
+        team1Score > team2Score
+          ? team1Name
+          : team2Score > team1Score
+          ? team2Name
+          : "Tie",
+    };
 
-  <Text style={[styles.stickyText,{width: nameWidth,textAlign: "center",fontWeight: "bold",overflow: "hidden",},]}numberOfLines={1}ellipsizeMode="tail">
-    {displayedTeam2Name}
-  </Text>
-</View>
+    setMatchSummary(liveSummary);
+    router.push("/scorescreen/summary");
+  };
 
-    </View>
-    
-  );
+  // const StickyScoreHeader = ({
+  //   team1Name,
+  //   team2Name,
+  //   team1Score,
+  //   team2Score,
+  // }: {
+  //   team1Name: string;
+  //   team2Name: string;
+  //   team1Score: number;
+  //   team2Score: number;
+  // }) => (
+  //   <View style={styles.stickyHeader}>
+  //     <View
+  //       style={{
+  //         flexDirection: "row",
+  //         justifyContent: "center",
+  //         alignItems: "center",
+  //         padding: 4,
+  //       }}
+  //     >
+  //       <Text
+  //         style={[
+  //           styles.stickyText,
+  //           {
+  //             width: nameWidth,
+  //             textAlign: "center",
+  //             fontWeight: "bold",
+  //             overflow: "hidden",
+  //           },
+  //         ]}
+  //         numberOfLines={1}
+  //         ellipsizeMode="tail"
+  //       >
+  //         {displayedTeam1Name}
+  //       </Text>
+
+  //       <Text
+  //         style={[
+  //           styles.stickyText,
+  //           { marginHorizontal: 4, fontWeight: "bold" },
+  //         ]}
+  //       >
+  //         {team1Score.toString().padStart(2, "0")} :{" "}
+  //         {team2Score.toString().padStart(2, "0")}
+  //       </Text>
+
+  //       <Text
+  //         style={[
+  //           styles.stickyText,
+  //           {
+  //             width: nameWidth,
+  //             textAlign: "center",
+  //             fontWeight: "bold",
+  //             overflow: "hidden",
+  //           },
+  //         ]}
+  //         numberOfLines={1}
+  //         ellipsizeMode="tail"
+  //       >
+  //         {displayedTeam2Name}
+  //       </Text>
+  //     </View>
+  //   </View>
+  // );
 
   const renderTeamSection = (
     teamNum: 1 | 2,
@@ -532,111 +610,110 @@ const handleFullTime = () => {
     setDropdownItems: any[],
     opponentPlayers: PlayerStatus[]
   ) => {
-const handleScore = (pts: number) => {
-  const isFoul =
-    (teamNum === 1 && team1FoulChecked) ||
-    (teamNum === 2 && team2FoulChecked);
+    const handleScore = (pts: number) => {
+      const isFoul =
+        (teamNum === 1 && team1FoulChecked) ||
+        (teamNum === 2 && team2FoulChecked);
 
-  if (!isFoul && !dropdownValue) {
-    setShowDropdownWarning(true);
-    return;
-  }
+      if (!isFoul && !dropdownValue) {
+        setShowDropdownWarning(true);
+        return;
+      }
 
-  setShowDropdownWarning(false);
-  setScore((prev) => prev + pts);
+      setShowDropdownWarning(false);
+      setScore((prev) => prev + pts);
 
-  // ✅ Trigger OUT logic — only when not foul
-  if (!isFoul && dropdownValue) {
-    const outTeam =
-      teamNum === 1
-        ? team1RaidRunning
-          ? 2 // team 1 is raiding → team 2 defender is out
-          : 1 // team 1 is defending → team 1 raider is out
-        : team2RaidRunning
-        ? 1 // team 2 is raiding → team 1 defender is out
-        : 2; // team 2 is defending → team 2 raider is out
+      // ✅ Trigger OUT logic — only when not foul
+      if (!isFoul && dropdownValue) {
+        const outTeam =
+          teamNum === 1
+            ? team1RaidRunning
+              ? 2 // team 1 is raiding → team 2 defender is out
+              : 1 // team 1 is defending → team 1 raider is out
+            : team2RaidRunning
+            ? 1 // team 2 is raiding → team 1 defender is out
+            : 2; // team 2 is defending → team 2 raider is out
 
-    const players = outTeam === 1 ? team1Players : team2Players;
-    const outIndex = players.findIndex((p) => p.name === dropdownValue);
+        const players = outTeam === 1 ? team1Players : team2Players;
+        const outIndex = players.findIndex((p) => p.name === dropdownValue);
 
-    if (outIndex !== -1) {
-      handleOut(outTeam, outIndex); // ✅ This ensures the function is actually used
-    }
-  }
+        if (outIndex !== -1) {
+          handleOut(outTeam, outIndex); // ✅ This ensures the function is actually used
+        }
+      }
 
-  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-  const setActionStack =
-    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-  setActionStack((prev) => [...prev, { type: "score", value: pts }]);
+      const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+      const setActionStack =
+        teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+      setActionStack((prev) => [...prev, { type: "score", value: pts }]);
 
-  // ✅ Detect if current team is raiding
-  const isRaiding =
-    (teamNum === 1 && team1RaidRunning) ||
-    (teamNum === 2 && team2RaidRunning);
+      // ✅ Detect if current team is raiding
+      const isRaiding =
+        (teamNum === 1 && team1RaidRunning) ||
+        (teamNum === 2 && team2RaidRunning);
 
-  // ✅ Reset empty raid counter
-  if (isRaiding) {
-    if (teamNum === 1) {
-      setTeam1EmptyRaidCount(0);
-      setTeam1PendingEmpty(false);
-    } else {
-      setTeam2EmptyRaidCount(0);
-      setTeam2PendingEmpty(false);
-    }
-  }
+      // ✅ Reset empty raid counter
+      if (isRaiding) {
+        if (teamNum === 1) {
+          setTeam1EmptyRaidCount(0);
+          setTeam1PendingEmpty(false);
+        } else {
+          setTeam2EmptyRaidCount(0);
+          setTeam2PendingEmpty(false);
+        }
+      }
 
-  // ✅ Update stats
-  if (teamNum === 1) {
-    if (isFoul) {
-      setTeam1FoulChecked(false);
-    } else if (team1RaidRunning && dropdownValue) {
-      // Raider from team 1
-      setTeam1RaidPoints((prev) => prev + pts);
-      setTeam1PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-        },
-      }));
-    } else if (!team1RaidRunning && dropdownValue) {
-      // Defender from team 1
-      setTeam1TacklePoints((prev) => prev + pts);
-      setTeam1PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-        },
-      }));
-    }
-  } else if (teamNum === 2) {
-    if (isFoul) {
-      setTeam2FoulChecked(false);
-    } else if (team2RaidRunning && dropdownValue) {
-      // Raider from team 2
-      setTeam2RaidPoints((prev) => prev + pts);
-      setTeam2PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-        },
-      }));
-    } else if (!team2RaidRunning && dropdownValue) {
-      // Defender from team 2
-      setTeam2TacklePoints((prev) => prev + pts);
-      setTeam2PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-        },
-      }));
-    }
-  }
-};
-
+      // ✅ Update stats
+      if (teamNum === 1) {
+        if (isFoul) {
+          setTeam1FoulChecked(false);
+        } else if (team1RaidRunning && dropdownValue) {
+          // Raider from team 1
+          setTeam1RaidPoints((prev) => prev + pts);
+          setTeam1PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+            },
+          }));
+        } else if (!team1RaidRunning && dropdownValue) {
+          // Defender from team 1
+          setTeam1TacklePoints((prev) => prev + pts);
+          setTeam1PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+            },
+          }));
+        }
+      } else if (teamNum === 2) {
+        if (isFoul) {
+          setTeam2FoulChecked(false);
+        } else if (team2RaidRunning && dropdownValue) {
+          // Raider from team 2
+          setTeam2RaidPoints((prev) => prev + pts);
+          setTeam2PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+            },
+          }));
+        } else if (!team2RaidRunning && dropdownValue) {
+          // Defender from team 2
+          setTeam2TacklePoints((prev) => prev + pts);
+          setTeam2PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+            },
+          }));
+        }
+      }
+    };
 
     const isDefending =
       (teamNum === 1 && team2RaidRunning) ||
@@ -681,19 +758,18 @@ const handleScore = (pts: number) => {
         ]);
       }
 
-  if (current.every((p) => p.out)) {
-  const revived = current.map((p) => ({ ...p, out: false }));
-  setCurrent(revived);
+      if (current.every((p) => p.out)) {
+        const revived = current.map((p) => ({ ...p, out: false }));
+        setCurrent(revived);
 
-  if (team === 1) {
-    setTeam2Score((s) => s + 2);
-    setTeam2Allouts((prev) => prev + 2);
-  } else {
-    setTeam1Score((s) => s + 2);
-    setTeam1Allouts((prev) => prev + 2);
-  }
-}
-
+        if (team === 1) {
+          setTeam2Score((s) => s + 2);
+          setTeam2Allouts((prev) => prev + 2);
+        } else {
+          setTeam1Score((s) => s + 2);
+          setTeam1Allouts((prev) => prev + 2);
+        }
+      }
     };
 
     const handleUndo = () => {
@@ -739,14 +815,16 @@ const handleScore = (pts: number) => {
     return (
       <View style={styles.teamSection}>
         <View style={styles.teamHeader}>
- <Text
-  style={[styles.teamTitle, { width: nameBlockWidth, textAlign: "left" }]}
-  numberOfLines={1}
-  ellipsizeMode="tail"
->
-  {truncateName(teamName)}
-</Text>
-
+          <Text
+            style={[
+              styles.teamTitle,
+              { width: nameBlockWidth, textAlign: "left" },
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {truncateName(teamName)}
+          </Text>
 
           {renderDots(players)}
           <Text style={styles.timerText}>{raidTimer}s</Text>
@@ -815,60 +893,71 @@ const handleScore = (pts: number) => {
               setRaidRunning(newState);
 
               // Reset dropdown selection when raid ends
-   if (!newState) {
-  const actions = teamNum === 1 ? team1RaidActions : team2RaidActions;
-  const raiderName = teamNum === 1 ? team1DropdownValue : team2DropdownValue;
+              if (!newState) {
+                const actions =
+                  teamNum === 1 ? team1RaidActions : team2RaidActions;
+                const raiderName =
+                  teamNum === 1 ? team1DropdownValue : team2DropdownValue;
 
-  // 🟢 Update player stats from actions
-  actions.forEach((action) => {
-    const { type, player, points, out } = action;
+                // 🟢 Update player stats from actions
+                actions.forEach((action) => {
+                  const { type, player, points, out } = action;
 
-    if (type === "raid" && raiderName) {
-      updatePlayerStats(`team${teamNum}`, raiderName, "raid", points);
-    }
+                  if (type === "raid" && raiderName) {
+                    updatePlayerStats(
+                      `team${teamNum}`,
+                      raiderName,
+                      "raid",
+                      points
+                    );
+                  }
 
-    if (type === "defense") {
-      const defenderTeamNum = teamNum === 1 ? 2 : 1;
-      updatePlayerStats(`team${defenderTeamNum}`, player, "defense", points);
-    }
+                  if (type === "defense") {
+                    const defenderTeamNum = teamNum === 1 ? 2 : 1;
+                    updatePlayerStats(
+                      `team${defenderTeamNum}`,
+                      player,
+                      "defense",
+                      points
+                    );
+                  }
 
-    if (out) {
-      const outTeam =
-        (type === "defense"
-          ? `team${teamNum}`
-          : `team${teamNum === 1 ? 2 : 1}`) as "team1" | "team2";
-      setPlayerOutStatus(outTeam, player, true);
-    }
-  });
+                  if (out) {
+                    const outTeam = (
+                      type === "defense"
+                        ? `team${teamNum}`
+                        : `team${teamNum === 1 ? 2 : 1}`
+                    ) as "team1" | "team2";
+                    setPlayerOutStatus(outTeam, player, true);
+                  }
+                });
 
-  // 🟠 Handle Do-Or-Die and empty raid fallback
-  if (raiderName && actions.length === 0) {
-    if (doOrDieTeam === teamNum) {
-      if (teamNum === 1) {
-        setTeam1EmptyRaidCount(0);
-        setDoOrDieTeam(null);
-      } else {
-        setTeam2EmptyRaidCount(0);
-        setDoOrDieTeam(null);
-      }
-    } else {
-      if (teamNum === 1) setTeam1PendingEmpty(true);
-      else setTeam2PendingEmpty(true);
-    }
-  }
+                // 🟠 Handle Do-Or-Die and empty raid fallback
+                if (raiderName && actions.length === 0) {
+                  if (doOrDieTeam === teamNum) {
+                    if (teamNum === 1) {
+                      setTeam1EmptyRaidCount(0);
+                      setDoOrDieTeam(null);
+                    } else {
+                      setTeam2EmptyRaidCount(0);
+                      setDoOrDieTeam(null);
+                    }
+                  } else {
+                    if (teamNum === 1) setTeam1PendingEmpty(true);
+                    else setTeam2PendingEmpty(true);
+                  }
+                }
 
-  // 🔻 Reset dropdown selections
-  setTeam1DropdownValue(null);
-  setTeam2DropdownValue(null);
+                // 🔻 Reset dropdown selections
+                setTeam1DropdownValue(null);
+                setTeam2DropdownValue(null);
 
-  // ✅ Stop main timer now if it hit 00:00 during raid
-  if (mainTimeOverWhileRaid) {
-    setMatchRunning(false);
-    setMainTimeOverWhileRaid(false);
-  }
-}
-
-
+                // ✅ Stop main timer now if it hit 00:00 during raid
+                if (mainTimeOverWhileRaid) {
+                  setMatchRunning(false);
+                  setMainTimeOverWhileRaid(false);
+                }
+              }
             }}
             disabled={
               // 🔒 Disable if the other team is raiding
@@ -891,19 +980,22 @@ const handleScore = (pts: number) => {
         <View style={styles.cardRow}>
           <View style={[styles.card, { flex: 2, marginRight: 6 }]}>
             {players.map(
-  (p, idx) =>
-    !p.out && (
-      <View key={idx} style={styles.playerRow}>
-        <Text style={{ flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
-          {truncateName(p.name)}
-        </Text>
-        <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
-          <Text style={styles.outBtn}>Out</Text>
-        </TouchableOpacity>
-      </View>
-    )
-)}
-
+              (p, idx) =>
+                !p.out && (
+                  <View key={idx} style={styles.playerRow}>
+                    <Text
+                      style={{ flex: 1 }}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {truncateName(p.name)}
+                    </Text>
+                    <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
+                      <Text style={styles.outBtn}>Out</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+            )}
           </View>
 
           <View style={[styles.card, { flex: 3, marginLeft: 6 }]}>
@@ -1131,31 +1223,33 @@ const handleScore = (pts: number) => {
 
   return (
     <View style={{ flex: 1 }}>
-      {showStickyHeader && (
-        <StickyScoreHeader
-          team1Name={team1Name}
-          team2Name={team2Name}
-          team1Score={team1Score}
-          team2Score={team2Score}
-        />
-      )}
+      <View style={styles.headerContainer}>
+  {/* Back Arrow */}
+ <TouchableOpacity onPress={handleDoubleBack} style={styles.iconContainer}>
+  <FontAwesome name="arrow-circle-left" size={22} color="white" />
+</TouchableOpacity>
+
+  {/* Title: team1 vs team2 */}
+<Text style={styles.headerTitle}>
+  {truncateName(team1Name)} vs {truncateName(team2Name)}
+</Text>
+
+
+
+   <Text style={styles.headerTitle}>
+    {team1Score} : {team2Score}
+  </Text>
+
+  {/* Scoreboard Icon */}
+  <TouchableOpacity onPress={generateMatchSummary} style={styles.iconContainer}>
+    <FontAwesome name="file-text" size={22} color="yellow" />
+  </TouchableOpacity>
+</View>
+
+     
 
       <ScrollView
         contentContainerStyle={styles.container}
-        scrollEventThrottle={16}
-        onScroll={(event) => {
-          const currentOffset = event.nativeEvent.contentOffset.y;
-          const direction =
-            currentOffset < scrollOffsetY.current ? "up" : "down";
-
-          if (direction === "down" && currentOffset > 50) {
-            setShowStickyHeader(true);
-          } else {
-            setShowStickyHeader(false);
-          }
-
-          scrollOffsetY.current = currentOffset;
-        }}
       >
         <View
           style={{
@@ -1167,41 +1261,53 @@ const handleScore = (pts: number) => {
           <View style={[styles.card, { flex: 1, marginRight: 5 }]}>
             {/* Toss and Choice Row */}
             <View style={{ marginBottom: 6 }}>
-  <Text style={styles.tossRow} numberOfLines={1} ellipsizeMode="tail">
-  <Text style={styles.tossLabel}>Toss: </Text>
-  <Text style={styles.tossTeamName}>
-    {selectedTossWinner === "team1" ? team1Name : team2Name}
-  </Text>
-</Text>
+              <Text
+                style={styles.tossRow}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                <Text style={styles.tossLabel}>Toss: </Text>
+                <Text style={styles.tossTeamName}>
+                  {selectedTossWinner === "team1" ? team1Name : team2Name}
+                </Text>
+              </Text>
 
-          <Text style={styles.tossRow}>
-   Choose: {choice}
-</Text>
+              <Text style={styles.tossRow}>Choose: {choice}</Text>
             </View>
 
             {/* Team Names Row */}
- <View style={styles.teamNamesRow}>
-<Text
-  style={[styles.teamNameText, { width: nameWidth, textAlign: "center" }]}
-  numberOfLines={1}
-  ellipsizeMode="tail"
->
-  {displayedTeam1Name}
-</Text>
+            <View style={styles.teamNamesRow}>
+              <Text
+                style={[
+                  styles.teamNameText,
+                  { width: nameWidth, textAlign: "center" },
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {displayedTeam1Name}
+              </Text>
 
-<Text style={[styles.vsText,{ fontWeight: "bold", marginHorizontal: 4 }]}>v/s</Text>
+              <Text
+                style={[
+                  styles.vsText,
+                  { fontWeight: "bold", marginHorizontal: 4 },
+                ]}
+              >
+                v/s
+              </Text>
 
-<Text
-  style={[styles.teamNameText, { width: nameWidth, textAlign: "center" }]}
-  numberOfLines={1}
-  ellipsizeMode="tail"
->
-  {displayedTeam2Name}
-</Text>
-
-
-</View>
-
+              <Text
+                style={[
+                  styles.teamNameText,
+                  { width: nameWidth, textAlign: "center" },
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {displayedTeam2Name}
+              </Text>
+            </View>
 
             {/* Score Row */}
             <Text style={styles.scoreRow}>
@@ -1302,18 +1408,26 @@ const handleScore = (pts: number) => {
               </>
             ) : (
               <View style={{ alignItems: "center" }}>
-  <Text style={{ fontSize: 22, fontWeight: "bold", color: "red", marginBottom: 6 }}>
-    Match Over!
-  </Text>
-  <Text style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}>
-    {team1Score > team2Score
-      ? `Winner: ${team1Name}`
-      : team2Score > team1Score
-      ? `Winner: ${team2Name}`
-      : "Match Tied"}
-  </Text>
-</View>
-
+                <Text
+                  style={{
+                    fontSize: 22,
+                    fontWeight: "bold",
+                    color: "red",
+                    marginBottom: 6,
+                  }}
+                >
+                  Match Over!
+                </Text>
+                <Text
+                  style={{ fontSize: 18, fontWeight: "bold", color: "#333" }}
+                >
+                  {team1Score > team2Score
+                    ? `Winner: ${team1Name}`
+                    : team2Score > team1Score
+                    ? `Winner: ${team2Name}`
+                    : "Match Tied"}
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -1447,7 +1561,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
     backgroundColor: "#f0f0f0",
-    
   },
   outBtn: {
     color: "red",
@@ -1457,7 +1570,6 @@ const styles = StyleSheet.create({
     borderColor: "red",
     borderRadius: 4,
     paddingHorizontal: 2,
-    
   },
   scoreBtnGroup: {
     flexWrap: "wrap",
@@ -1499,16 +1611,16 @@ const styles = StyleSheet.create({
     textAlign: "left",
     marginBottom: 4,
   },
-tossLabel: {
-  color: "#555",          // slightly dim for label
-  fontWeight: "500",
-},
+  tossLabel: {
+    color: "#555", // slightly dim for label
+    fontWeight: "500",
+  },
 
-tossTeamName: {
-  color: "#555",          // darker for name
-  fontWeight: "500",
-  flexShrink: 1,
-},
+  tossTeamName: {
+    color: "#555", // darker for name
+    fontWeight: "500",
+    flexShrink: 1,
+  },
   teamName: {
     fontSize: 16,
     fontWeight: "bold",
@@ -1516,30 +1628,30 @@ tossTeamName: {
     color: "#2e06b3ff",
   },
   teamNamesRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 2,
-  flexWrap: "nowrap",
-  overflow: "hidden",
-},
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+    flexWrap: "nowrap",
+    overflow: "hidden",
+  },
 
-teamNameText: {
-  fontSize: 16,
-  fontWeight: "bold",
-  flexShrink: 1,
-  maxWidth: "40%",
-   color: "#2e06b3ff",
-  
-   // optional: prevent taking too much space
-},
+  teamNameText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    flexShrink: 1,
+    maxWidth: "40%",
+    color: "#2e06b3ff",
 
-vsText: {
-  fontSize: 14,
-  color: "red",
-  marginHorizontal: 4,
-  fontWeight: "bold",
-},
+    // optional: prevent taking too much space
+  },
+
+  vsText: {
+    fontSize: 14,
+    color: "red",
+    marginHorizontal: 4,
+    fontWeight: "bold",
+  },
   scoreRow: {
     fontSize: 24,
     fontWeight: "bold",
@@ -1581,4 +1693,32 @@ vsText: {
     fontWeight: "bold",
     fontSize: 12,
   },
+  headerContainer: {
+  height: 70,
+  backgroundColor: "#2e06b3ff",
+  flexDirection: "row",
+  alignItems: "flex-end",
+  justifyContent: "space-between",
+  paddingHorizontal: 10,
+  borderBottomWidth: 1,
+  borderColor: "#ccc",
+  
+},
+headerTitle: {
+  fontSize: 20,
+  fontWeight: "bold",
+  marginBottom: 4,
+  color: "white",
+},
+iconContainer: {
+  width: 30,
+  alignItems: "center",
+  marginBottom: 4,
+  fontWeight: "bold",
+  fontSize: 24,
+},
+scoreboardIcon: {
+  fontSize: 22,
+},
+
 });
