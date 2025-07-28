@@ -1368,7 +1368,7 @@ export default function ScoreScreen() {
                     {formatTime(matchTimer)}
                   </Text>
                   <TouchableOpacity
-                    style={[styles.controlBtn, { backgroundColor: "#2196F3" }]}
+                    // style={[styles.controlBtn, ]}
                     onPress={() => setMatchRunning((prev) => !prev)}
                     disabled={gamePhase === "halftime"}
                   >

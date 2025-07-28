@@ -1,7 +1,7 @@
 import { getMatchSummary } from "@/storedata/matchSummaryStore";
-import React from "react";
+import { useTimerStore } from "@/storedata/timerStore";
+import React, { useEffect } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import {useTimerStore} from "@/storedata/timerStore";
 
 type PlayerStat = {
   name: string;
@@ -9,11 +9,12 @@ type PlayerStat = {
   tackle: number;
   extra: number;
 };
-import { useEffect } from "react";
 
 export default function MatchSummary() {
     const time = useTimerStore((s) => s.timer);
     const setTimer = useTimerStore((s) => s.setTimer);
+
+
   
     useEffect(() => {
       const interval = setInterval(() => {
@@ -21,6 +22,10 @@ export default function MatchSummary() {
       }, 1000);
       return () => clearInterval(interval);
     }, []);
+
+
+
+
   const matchSummary = getMatchSummary() as {
   team1: { name: string; score: number; allout: number; points: any; players: PlayerStat[] };
   team2: { name: string; score: number; allout: number; points: any; players: PlayerStat[] };
@@ -40,6 +45,11 @@ export default function MatchSummary() {
   }
 
   const { team1, team2, winner, gamePhase, timer } = matchSummary;
+//   useEffect(() => {
+//   if (gamePhase === "second") {
+//     setTimer(timer); // 1 minute for second half
+//   }
+// }, [gamePhase]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -53,9 +63,9 @@ export default function MatchSummary() {
       : gamePhase === "halftime"
       ? "Halftime"
       : gamePhase === "first"
-      ? `First Half - ${formatTime(time)}`
+      ? `First Half - ${formatTime(timer)}`
       : gamePhase === "second"
-      ? `Second Half - ${formatTime(time)}`
+      ? `Second Half - ${formatTime(timer)}`
       : "Not Started";
 
   const pointTypes: (keyof typeof team1.points)[] = ["raid", "tackle", "allout", "extra"];

@@ -23,7 +23,7 @@ const IndexScreen = () => {
   const [showPlayers, setShowPlayers] = useState(true);
   const [selectedTossWinner, setSelectedTossWinner] = useState<'team1' | 'team2' | null>(null);
   const [choice, setChoice] = useState<'Raid' | 'Ground' | null>(null);
-  const [time, setTime] = useState('30:00');
+  const [time, setTime] = useState('20:00');
   const [bonusAllowed, setBonusAllowed] = useState(true);
   const [superTackleAllowed, setSuperTackleAllowed] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -80,8 +80,15 @@ const IndexScreen = () => {
   ];
 
   return (
+      <View style={{ flex: 1 }}>
+    {/* Fixed Header */}
+    <View style={styles.fixedHeader}>
+      <Text style={styles.header}>Kabaddi Match Setup</Text>
+    </View>
+
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
       {/* <Text style={styles.header}>Kabaddi Match Setup</Text> */}
+      
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Teams</Text>
         <TextInput
@@ -238,12 +245,13 @@ const IndexScreen = () => {
         <Text style={styles.startButtonText}>Start Match</Text>
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  container: { padding: 20,flex: 1,  },
+  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#fff' ,marginLeft: 20},
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   subTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
@@ -268,6 +276,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     color: '#000',
   },
+  fixedHeader: {
+  height: 100,
+  backgroundColor: '#2e06b3ff',
+  justifyContent: 'flex-end',
+  alignItems: 'flex-start',
+  elevation: 4, // shadow for Android
+  zIndex: 10,
+},
+
+
   removeText: {
     color: 'red',
     fontSize: 10,
