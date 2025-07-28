@@ -2,13 +2,8 @@ import { setMatchSummary } from "@/storedata/matchSummaryStore"; // ✅ adjust p
 import { FontAwesome } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import Toast from 'react-native-root-toast';
-
-
-
 
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -95,8 +90,8 @@ export default function ScoreScreen() {
   const timeoutInterval = useRef<NodeJS.Timeout | null>(null);
 
   const [gamePhase, setGamePhase] = useState<
-    "first" | "halftime" | "second" | "ended"
-  >("first");
+    "not_started" | "first" | "halftime" | "second" | "ended"
+  >("not_started");
 
   const [team1RaidTimer, setTeam1RaidTimer] = useState(30);
   const [team1RaidRunning, setTeam1RaidRunning] = useState(false);
@@ -149,8 +144,9 @@ export default function ScoreScreen() {
   const [mainTimeOverWhileRaid, setMainTimeOverWhileRaid] = useState(false);
 
   const [backPressCount, setBackPressCount] = useState(0);
-const backPressTimer = useRef<NodeJS.Timeout | null>(null);
-
+  const [showBackWarning, setShowBackWarning] = useState(false);
+  const backPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const [timer, setTimer] = useState<number>(matchTime); // or however you're tracking time
 
   const [teamNum, setTeamNum] = useState<1 | 2>(1); // current team's turn
 
@@ -408,27 +404,28 @@ const backPressTimer = useRef<NodeJS.Timeout | null>(null);
     }));
   };
 
+  const router = useRouter();
+  const handleDoubleBack = () => {
+    if (backPressCount === 0) {
+      setBackPressCount(1);
+      setShowBackWarning(true);
 
-const router = useRouter();
-const handleDoubleBack = () => {
-  if (backPressCount === 0) {
-    setBackPressCount(1);
+      backPressTimer.current = setTimeout(() => {
+        setBackPressCount(0);
+        setShowBackWarning(false);
+      }, 2000);
+    } else {
+      router.push("/");
+    }
+  };
 
-    Toast.show('Press again to go back', {
-      duration: Toast.durations.SHORT,
-      position: Toast.positions.BOTTOM,
-    });
-
-    backPressTimer.current = setTimeout(() => {
-      setBackPressCount(0);
-    }, 2000);
-  } else {
-    router.push('/');
-  }
-};
-
-
-
+  useEffect(() => {
+    return () => {
+      if (backPressTimer.current) {
+        clearTimeout(backPressTimer.current);
+      }
+    };
+  }, []);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
@@ -453,14 +450,19 @@ const handleDoubleBack = () => {
     setMatchRunning(false);
   };
 
-  const generateMatchSummary = () => {
-    console.log(
-      "Current Allouts => Team 1:",
-      team1Allouts,
-      "Team 2:",
-      team2Allouts
-    );
+  const handleStartPress = () => {
+    if (
+      gamePhase === "halftime" ||
+      gamePhase === "second" ||
+      gamePhase === "ended"
+    )
+      return;
 
+    setGamePhase("first"); // 👈 Make sure to mark as first half
+    setMatchRunning(true);
+  };
+
+  const generateMatchSummary = () => {
     const formatPlayers = (playerNames: string[], stats: Record<string, any>) =>
       playerNames.map((name) => {
         const p = stats[name] || {};
@@ -472,7 +474,18 @@ const handleDoubleBack = () => {
         };
       });
 
-    const liveSummary = {
+    const timeStatus =
+      gamePhase === "ended"
+        ? "Full Time"
+        : gamePhase === "halftime"
+        ? "Halftime"
+        : gamePhase === "first"
+        ? `First Half - ${formatTime(timer)}`
+        : gamePhase === "second"
+        ? `Second Half - ${formatTime(timer)}`
+        : "Not Started";
+
+    const summary = {
       team1: {
         name: team1Name,
         score: team1Score,
@@ -515,15 +528,20 @@ const handleDoubleBack = () => {
           team2PlayerStats
         ),
       },
+      timeStatus, // keep this for display
+      gamePhase, // ✅ add this
+      timer, // ✅ add this
       winner:
-        team1Score > team2Score
-          ? team1Name
-          : team2Score > team1Score
-          ? team2Name
-          : "Tie",
+        gamePhase === "ended"
+          ? team1Score > team2Score
+            ? team1Name
+            : team2Score > team1Score
+            ? team2Name
+            : "Tie"
+          : "Match In Progress",
     };
 
-    setMatchSummary(liveSummary);
+    setMatchSummary(summary);
     router.push("/scorescreen/summary");
   };
 
@@ -1224,33 +1242,42 @@ const handleDoubleBack = () => {
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.headerContainer}>
-  {/* Back Arrow */}
- <TouchableOpacity onPress={handleDoubleBack} style={styles.iconContainer}>
-  <FontAwesome name="arrow-circle-left" size={22} color="white" />
-</TouchableOpacity>
+        {/* Back Arrow and Warning Text */}
+        <View style={{ alignItems: "center" }}>
+          <TouchableOpacity
+            onPress={handleDoubleBack}
+            style={[styles.iconContainer, backPressCount === 1 && {}]}
+          >
+            <FontAwesome name="arrow-circle-left" size={30} color="#fff" />
+          </TouchableOpacity>
 
-  {/* Title: team1 vs team2 */}
-<Text style={styles.headerTitle}>
-  {truncateName(team1Name)} vs {truncateName(team2Name)}
-</Text>
+          {showBackWarning && (
+            <Text style={styles.backWarningText}>Press again</Text>
+          )}
+        </View>
 
+        {/* Title and Score */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.headerTitle}>
+            {truncateName(team1Name)} <Text style={styles.vstext}>v/s</Text>{" "}
+            {truncateName(team2Name)}
+          </Text>
 
+          <Text style={styles.headerScore}>
+            {team1Score} : {team2Score}
+          </Text>
+        </View>
 
-   <Text style={styles.headerTitle}>
-    {team1Score} : {team2Score}
-  </Text>
+        {/* Scoreboard Icon */}
+        <TouchableOpacity
+          onPress={generateMatchSummary}
+          style={styles.iconContainer}
+        >
+          <FontAwesome name="file-text" size={30} color="yellow" />
+        </TouchableOpacity>
+      </View>
 
-  {/* Scoreboard Icon */}
-  <TouchableOpacity onPress={generateMatchSummary} style={styles.iconContainer}>
-    <FontAwesome name="file-text" size={22} color="yellow" />
-  </TouchableOpacity>
-</View>
-
-     
-
-      <ScrollView
-        contentContainerStyle={styles.container}
-      >
+      <ScrollView contentContainerStyle={styles.container}>
         <View
           style={{
             flexDirection: "row",
@@ -1345,9 +1372,20 @@ const handleDoubleBack = () => {
                     onPress={() => setMatchRunning((prev) => !prev)}
                     disabled={gamePhase === "halftime"}
                   >
-                    <Text style={styles.controlBtnText}>
-                      {matchRunning ? "Pause" : "Start"}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Set gamePhase to "first" only when starting the match for the first time
+                        if (!matchRunning && gamePhase === "not_started") {
+                          setGamePhase("first");
+                        }
+                        setMatchRunning(!matchRunning);
+                      }}
+                      style={styles.controlBtn}
+                    >
+                      <Text style={styles.controlBtnText}>
+                        {matchRunning ? "Pause" : "Start"}
+                      </Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 </View>
 
@@ -1652,6 +1690,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     fontWeight: "bold",
   },
+  vstext: {
+    fontSize: 18,
+    color: "yellow",
+    fontWeight: "bold",
+    marginHorizontal: 4,
+  },
   scoreRow: {
     fontSize: 24,
     fontWeight: "bold",
@@ -1693,32 +1737,48 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 12,
   },
-  headerContainer: {
-  height: 70,
-  backgroundColor: "#2e06b3ff",
-  flexDirection: "row",
-  alignItems: "flex-end",
-  justifyContent: "space-between",
-  paddingHorizontal: 10,
-  borderBottomWidth: 1,
-  borderColor: "#ccc",
-  
-},
-headerTitle: {
-  fontSize: 20,
-  fontWeight: "bold",
-  marginBottom: 4,
-  color: "white",
-},
-iconContainer: {
-  width: 30,
-  alignItems: "center",
-  marginBottom: 4,
-  fontWeight: "bold",
-  fontSize: 24,
-},
-scoreboardIcon: {
-  fontSize: 22,
-},
 
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end", // aligns all items to the bottom
+    justifyContent: "space-between",
+    padding: 10,
+    backgroundColor: "#2e06b3ff",
+    height: 100, // fixed height for the header
+  },
+
+  titleContainer: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "flex-end", // aligns title to the bottom
+  },
+
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
+  },
+
+  headerScore: {
+    fontSize: 20,
+    color: "#fff",
+    textAlign: "center",
+    marginTop: 2,
+    fontWeight: "bold",
+    fontFamily: "monospace", // optional: for a fixed-width font
+  },
+
+  iconContainer: {
+    padding: 4,
+    // backgroundColor: '#444',
+    borderRadius: 5,
+    marginHorizontal: 5,
+    marginBottom: 4,
+  },
+
+  backWarningText: {
+    fontSize: 10,
+    color: "white",
+  },
 });
