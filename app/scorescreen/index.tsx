@@ -141,6 +141,8 @@ const [team1Allouts, setTeam1Allouts] = useState(0);
 const [team2Allouts, setTeam2Allouts] = useState(0);
 const [team1PlayerStats, setTeam1PlayerStats] = useState<PlayerStatsMap>({});
 const [team2PlayerStats, setTeam2PlayerStats] = useState<PlayerStatsMap>({});
+const [mainTimeOverWhileRaid, setMainTimeOverWhileRaid] = useState(false);
+
 
 const [teamNum, setTeamNum] = useState<1 | 2>(1); // current team's turn
 
@@ -159,26 +161,37 @@ type PlayerStatsMap = {
 };
 
 
+useEffect(() => {
+  if (matchRunning) {
+    matchInterval.current = setInterval(() => {
+      setMatchTimer((prev) => {
+        if (prev === 1) {
+          clearInterval(matchInterval.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  } else {
+    if (matchInterval.current) clearInterval(matchInterval.current);
+  }
+  return () => {
+    if (matchInterval.current) clearInterval(matchInterval.current);
+  };
+}, [matchRunning]);
+
+
 
   useEffect(() => {
-    if (matchRunning) {
-      matchInterval.current = setInterval(() => {
-        setMatchTimer((prev) => {
-          if (prev === 1) {
-            clearInterval(matchInterval.current!);
-            setMatchRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  if (matchTimer === 0) {
+    if (team1RaidRunning || team2RaidRunning) {
+      setMainTimeOverWhileRaid(true); // ⏱️ Defer stopping
     } else {
-      if (matchInterval.current) clearInterval(matchInterval.current);
+      setMatchRunning(false); // ❌ Stop immediately
     }
-    return () => {
-      if (matchInterval.current) clearInterval(matchInterval.current);
-    };
-  }, [matchRunning]);
+  }
+}, [matchTimer, team1RaidRunning, team2RaidRunning]);
+
 
   useEffect(() => {
     if (timeoutRunning) {
@@ -280,49 +293,69 @@ type PlayerStatsMap = {
     if (isTeam1) setTeam1RaidRunning(false);
     else setTeam2RaidRunning(false);
   };
+useEffect(() => {
+  if (team1RaidRunning) {
+    team1RaidInterval.current = setInterval(() => {
+      setTeam1RaidTimer((prev) => {
+        if (prev === 1) {
+          clearInterval(team1RaidInterval.current!);
 
-  useEffect(() => {
-    if (team1RaidRunning) {
-      team1RaidInterval.current = setInterval(() => {
-        setTeam1RaidTimer((prev) => {
-          if (prev === 1) {
-            clearInterval(team1RaidInterval.current!);
+          // ✅ Delay endRaid to ensure state is fresh
+          requestAnimationFrame(() => {
+            endRaid(1);
 
-            // ✅ Delay endRaid to ensure state is fresh
-            requestAnimationFrame(() => endRaid(1));
+            // ✅ Stop main timer if needed
+            if (mainTimeOverWhileRaid) {
+              setMatchRunning(false);
+              setMainTimeOverWhileRaid(false);
+            }
+          });
 
-            return 30;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(team1RaidInterval.current!);
-      setTeam1RaidTimer(30);
-    }
-    return () => clearInterval(team1RaidInterval.current!);
-  }, [team1RaidRunning]);
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  } else {
+    clearInterval(team1RaidInterval.current!);
+    setTeam1RaidTimer(30);
+  }
 
-  useEffect(() => {
-    if (team2RaidRunning) {
-      team2RaidInterval.current = setInterval(() => {
-        setTeam2RaidTimer((prev) => {
-          if (prev === 1) {
-            clearInterval(team2RaidInterval.current!);
+  return () => clearInterval(team1RaidInterval.current!);
+}, [team1RaidRunning]);
 
-            // ✅ Delay endRaid to ensure state is fresh
-            requestAnimationFrame(() => endRaid(2));
-            return 30;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(team2RaidInterval.current!);
-      setTeam2RaidTimer(30);
-    }
-    return () => clearInterval(team2RaidInterval.current!);
-  }, [team2RaidRunning]);
+
+useEffect(() => {
+  if (team2RaidRunning) {
+    team2RaidInterval.current = setInterval(() => {
+      setTeam2RaidTimer((prev) => {
+        if (prev === 1) {
+          clearInterval(team2RaidInterval.current!);
+
+          // ✅ Delay endRaid to ensure state is fresh
+          requestAnimationFrame(() => {
+            endRaid(2);
+
+            // ✅ Stop main timer if needed
+            if (mainTimeOverWhileRaid) {
+              setMatchRunning(false);
+              setMainTimeOverWhileRaid(false);
+            }
+          });
+
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  } else {
+    clearInterval(team2RaidInterval.current!);
+    setTeam2RaidTimer(30);
+  }
+
+  return () => clearInterval(team2RaidInterval.current!);
+}, [team2RaidRunning]);
+
 
 
 const updatePlayerStats = (
@@ -451,8 +484,6 @@ const handleFullTime = () => {
   router.push("/scorescreen/summary");
 };
 
-
-
   const StickyScoreHeader = ({
     team1Name,
     team2Name,
@@ -482,71 +513,6 @@ const handleFullTime = () => {
     </View>
     
   );
-
-// function handleOut(team: 1 | 2, index: number) {
-//   const currentPlayers = team === 1 ? [...team1Players] : [...team2Players];
-//   const setCurrentPlayers = team === 1 ? setTeam1Players : setTeam2Players;
-
-//   // Skip if already out
-//   if (currentPlayers[index].out) return;
-
-//   // Mark the player out
-//   currentPlayers[index].out = true;
-//   setCurrentPlayers(currentPlayers);
-
-//   const opponentPlayers = team === 1 ? [...team2Players] : [...team1Players];
-//   const setOpponentPlayers = team === 1 ? setTeam2Players : setTeam1Players;
-
-//   const actionStack = team === 1 ? team1RaidActions : team2RaidActions;
-//   const setActionStack = team === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-//   setActionStack([...actionStack, { type: "out", index }]);
-
-//   // Revive a player from opponent if any are out
-//   const reviveIndex = opponentPlayers.findIndex((p) => p.out);
-//   if (reviveIndex !== -1) {
-//     opponentPlayers[reviveIndex].out = false;
-//     setOpponentPlayers(opponentPlayers);
-
-//     const setOpponentActionStack = team === 1 ? setTeam2RaidActions : setTeam1RaidActions;
-//     setOpponentActionStack((prev) => [
-//       ...prev,
-//       { type: "revive", index: reviveIndex },
-//     ]);
-//   }
-
-// if (currentPlayers.every((p) => p.out)) {
-//   console.log("✅ All-out triggered for team", team);
-
-//   const revivedTeam = currentPlayers.map((p) => ({ ...p, out: false }));
-//   setCurrentPlayers(revivedTeam);
-
-//   if (team === 1) {
-//     setTeam2Score((s) => {
-//       console.log("Team 2 score before:", s);
-//       return s + 2;
-//     });
-
-//     setTeam2Allouts((prev) => {
-//       console.log("Team 2 Allouts before:", prev);
-//       return prev + 1;
-//     });
-//   } else {
-//     setTeam1Score((s) => {
-//       console.log("Team 1 score before:", s);
-//       return s + 2;
-//     });
-
-//     setTeam1Allouts((prev) => {
-//       console.log("Team 1 Allouts before:", prev);
-//       return prev + 1;
-//     });
-//   }
-// } else {
-//   console.log("⛔ Not all players are out for team", team);
-// }
-
-// }
-
 
   const renderTeamSection = (
     teamNum: 1 | 2,
@@ -849,7 +815,7 @@ const handleScore = (pts: number) => {
               setRaidRunning(newState);
 
               // Reset dropdown selection when raid ends
-              if (!newState) {
+   if (!newState) {
   const actions = teamNum === 1 ? team1RaidActions : team2RaidActions;
   const raiderName = teamNum === 1 ? team1DropdownValue : team2DropdownValue;
 
@@ -867,19 +833,17 @@ const handleScore = (pts: number) => {
     }
 
     if (out) {
-      const outTeam = (type === "defense"
-  ? `team${teamNum}`
-  : `team${teamNum === 1 ? 2 : 1}`) as "team1" | "team2";
-
-setPlayerOutStatus(outTeam, player, true);
-
+      const outTeam =
+        (type === "defense"
+          ? `team${teamNum}`
+          : `team${teamNum === 1 ? 2 : 1}`) as "team1" | "team2";
+      setPlayerOutStatus(outTeam, player, true);
     }
   });
 
   // 🟠 Handle Do-Or-Die and empty raid fallback
   if (raiderName && actions.length === 0) {
     if (doOrDieTeam === teamNum) {
-      // Reset empty raid count if this was Do-or-Die
       if (teamNum === 1) {
         setTeam1EmptyRaidCount(0);
         setDoOrDieTeam(null);
@@ -888,7 +852,6 @@ setPlayerOutStatus(outTeam, player, true);
         setDoOrDieTeam(null);
       }
     } else {
-      // Mark pending empty raid
       if (teamNum === 1) setTeam1PendingEmpty(true);
       else setTeam2PendingEmpty(true);
     }
@@ -897,7 +860,14 @@ setPlayerOutStatus(outTeam, player, true);
   // 🔻 Reset dropdown selections
   setTeam1DropdownValue(null);
   setTeam2DropdownValue(null);
+
+  // ✅ Stop main timer now if it hit 00:00 during raid
+  if (mainTimeOverWhileRaid) {
+    setMatchRunning(false);
+    setMainTimeOverWhileRaid(false);
+  }
 }
+
 
             }}
             disabled={
