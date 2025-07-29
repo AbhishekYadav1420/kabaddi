@@ -628,110 +628,104 @@ export default function ScoreScreen() {
     setDropdownItems: any[],
     opponentPlayers: PlayerStatus[]
   ) => {
-    const handleScore = (pts: number) => {
-      const isFoul =
-        (teamNum === 1 && team1FoulChecked) ||
-        (teamNum === 2 && team2FoulChecked);
+  const handleScore = (pts: number) => {
+  const isFoul =
+    (teamNum === 1 && team1FoulChecked) ||
+    (teamNum === 2 && team2FoulChecked);
 
-      if (!isFoul && !dropdownValue) {
-        setShowDropdownWarning(true);
-        return;
-      }
+  if (!isFoul && !dropdownValue) {
+    setShowDropdownWarning(true);
+    return;
+  }
 
-      setShowDropdownWarning(false);
-      setScore((prev) => prev + pts);
+  setShowDropdownWarning(false);
+  setScore((prev) => prev + pts);
 
-      // ✅ Trigger OUT logic — only when not foul
-      if (!isFoul && dropdownValue) {
-        const outTeam =
-          teamNum === 1
-            ? team1RaidRunning
-              ? 2 // team 1 is raiding → team 2 defender is out
-              : 1 // team 1 is defending → team 1 raider is out
-            : team2RaidRunning
-            ? 1 // team 2 is raiding → team 1 defender is out
-            : 2; // team 2 is defending → team 2 raider is out
+  // ❌ Removed automatic OUT logic — all outs must be manual now
+  // if (!isFoul && dropdownValue) {
+  //   const outTeam =
+  //     teamNum === 1
+  //       ? team1RaidRunning
+  //         ? 2
+  //         : 1
+  //       : team2RaidRunning
+  //       ? 1
+  //       : 2;
 
-        const players = outTeam === 1 ? team1Players : team2Players;
-        const outIndex = players.findIndex((p) => p.name === dropdownValue);
+  //   const players = outTeam === 1 ? team1Players : team2Players;
+  //   const outIndex = players.findIndex((p) => p.name === dropdownValue);
 
-        if (outIndex !== -1) {
-          handleOut(outTeam, outIndex); // ✅ This ensures the function is actually used
-        }
-      }
+  //   if (outIndex !== -1) {
+  //     handleOut(outTeam, outIndex);
+  //   }
+  // }
 
-      const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-      const setActionStack =
-        teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-      setActionStack((prev) => [...prev, { type: "score", value: pts }]);
+  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+  const setActionStack =
+    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+  setActionStack((prev) => [...prev, { type: "score", value: pts }]);
 
-      // ✅ Detect if current team is raiding
-      const isRaiding =
-        (teamNum === 1 && team1RaidRunning) ||
-        (teamNum === 2 && team2RaidRunning);
+  const isRaiding =
+    (teamNum === 1 && team1RaidRunning) ||
+    (teamNum === 2 && team2RaidRunning);
 
-      // ✅ Reset empty raid counter
-      if (isRaiding) {
-        if (teamNum === 1) {
-          setTeam1EmptyRaidCount(0);
-          setTeam1PendingEmpty(false);
-        } else {
-          setTeam2EmptyRaidCount(0);
-          setTeam2PendingEmpty(false);
-        }
-      }
+  if (isRaiding) {
+    if (teamNum === 1) {
+      setTeam1EmptyRaidCount(0);
+      setTeam1PendingEmpty(false);
+    } else {
+      setTeam2EmptyRaidCount(0);
+      setTeam2PendingEmpty(false);
+    }
+  }
 
-      // ✅ Update stats
-      if (teamNum === 1) {
-        if (isFoul) {
-          setTeam1FoulChecked(false);
-        } else if (team1RaidRunning && dropdownValue) {
-          // Raider from team 1
-          setTeam1RaidPoints((prev) => prev + pts);
-          setTeam1PlayerStats((prev) => ({
-            ...prev,
-            [dropdownValue]: {
-              ...prev[dropdownValue],
-              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-            },
-          }));
-        } else if (!team1RaidRunning && dropdownValue) {
-          // Defender from team 1
-          setTeam1TacklePoints((prev) => prev + pts);
-          setTeam1PlayerStats((prev) => ({
-            ...prev,
-            [dropdownValue]: {
-              ...prev[dropdownValue],
-              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-            },
-          }));
-        }
-      } else if (teamNum === 2) {
-        if (isFoul) {
-          setTeam2FoulChecked(false);
-        } else if (team2RaidRunning && dropdownValue) {
-          // Raider from team 2
-          setTeam2RaidPoints((prev) => prev + pts);
-          setTeam2PlayerStats((prev) => ({
-            ...prev,
-            [dropdownValue]: {
-              ...prev[dropdownValue],
-              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-            },
-          }));
-        } else if (!team2RaidRunning && dropdownValue) {
-          // Defender from team 2
-          setTeam2TacklePoints((prev) => prev + pts);
-          setTeam2PlayerStats((prev) => ({
-            ...prev,
-            [dropdownValue]: {
-              ...prev[dropdownValue],
-              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-            },
-          }));
-        }
-      }
-    };
+  if (teamNum === 1) {
+    if (isFoul) {
+      setTeam1FoulChecked(false);
+    } else if (team1RaidRunning && dropdownValue) {
+      setTeam1RaidPoints((prev) => prev + pts);
+      setTeam1PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+        },
+      }));
+    } else if (!team1RaidRunning && dropdownValue) {
+      setTeam1TacklePoints((prev) => prev + pts);
+      setTeam1PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+        },
+      }));
+    }
+  } else if (teamNum === 2) {
+    if (isFoul) {
+      setTeam2FoulChecked(false);
+    } else if (team2RaidRunning && dropdownValue) {
+      setTeam2RaidPoints((prev) => prev + pts);
+      setTeam2PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+        },
+      }));
+    } else if (!team2RaidRunning && dropdownValue) {
+      setTeam2TacklePoints((prev) => prev + pts);
+      setTeam2PlayerStats((prev) => ({
+        ...prev,
+        [dropdownValue]: {
+          ...prev[dropdownValue],
+          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+        },
+      }));
+    }
+  }
+};
+
 
     const isDefending =
       (teamNum === 1 && team2RaidRunning) ||

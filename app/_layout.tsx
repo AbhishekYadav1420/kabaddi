@@ -14,5 +14,6 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ title: 'Kabaddi Match Setup',}} />
       <Stack.Screen name="score" options={{ headerShown: false }} />
     </Stack>
+    
   );
 }
