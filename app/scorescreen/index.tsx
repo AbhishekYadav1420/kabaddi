@@ -542,7 +542,7 @@ export default function ScoreScreen() {
     };
 
     setMatchSummary(summary);
-    router.push("/scorescreen/summary");
+    router.push("/scorecard");
   };
 
   // const StickyScoreHeader = ({
