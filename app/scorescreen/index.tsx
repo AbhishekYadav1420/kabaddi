@@ -1,8 +1,7 @@
-import { setMatchSummary } from "@/storedata/matchSummaryStore"; // ✅ adjust path if needed
+import { setMatchSummary } from "@/storedata/matchSummaryStore";
 import { FontAwesome } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-
 import {
   ScrollView,
   StyleSheet,
@@ -13,34 +12,90 @@ import {
 import DropDownPicker from "react-native-dropdown-picker";
 
 type PlayerStatus = { name: string; out: boolean };
+type PlayerStatsMap = Record<
+  string,
+  { raidPoints: number; tacklePoints: number }
+>;
 
 export default function ScoreScreen() {
-  const {
-    team1,
-    team2,
-    playersTeam1,
-    playersTeam2,
-    time,
-    bonusAllowed,
-    superTackleAllowed,
-    choice,
-    selectedTossWinner,
-  } = useLocalSearchParams<{
-    team1: string;
-    team2: string;
-    playersTeam1: string;
-    playersTeam2: string;
-    selectedTossWinner: string;
-    choice: string;
-    time: string;
-    bonusAllowed: string;
-    superTackleAllowed: string;
-  }>();
+  const { matchId } = useLocalSearchParams<{ matchId: string }>();
 
-  const team1Name = team1 || "Team 1";
-  const team2Name = team2 || "Team 2";
+  // ⬇️ States populated from API
+  const [team1, setTeam1] = useState("Team 1");
+  const [team2, setTeam2] = useState("Team 2");
+  const [playersTeam1, setPlayersTeam1] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [playersTeam2, setPlayersTeam2] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  const [selectedTossWinner, setSelectedTossWinner] = useState("");
+  const [choice, setChoice] = useState("");
+  const [time, setTime] = useState("10:00");
+  const [bonusAllowed, setBonusAllowed] = useState("false");
+  const [superTackleAllowed, setSuperTackleAllowed] = useState("false");
+
+  // console.log(playersTeam1);
+  console.log(playersTeam2);
+  // ✅ Fetch from API
+  useEffect(() => {
+    const fetchMatchData = async () => {
+      // if (!matchId) return;
+
+      try {
+        const res = await fetch(
+          `https://apiscoreboard.codedonor.in/api/match/id?id=${90}`
+        );
+        const team1Players = await fetch(
+          `https://apiscoreboard.codedonor.in/api/player/${179}`
+        );
+        const team2Players = await fetch(
+          `https://apiscoreboard.codedonor.in/api/player/${180}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch match setup");
+        const data = await res.json();
+        const team1PlayersData = await team1Players.json();
+        const team2PlayersData = await team2Players.json();
+
+        var t1 = team1PlayersData?.map((item: any) => item?.name);
+        const team1DropdownItems = t1.map((name: string) => ({
+          label: name,
+          value: name,
+        }));
+        var t2 = team2PlayersData?.map((item: any) => item?.name);
+        const team2DropdownItems = t2.map((name: string) => ({
+          label: name,
+          value: name,
+        }));
+        console.log(team1PlayersData?.map((item: any) => item?.name));
+        console.log(team2PlayersData);
+
+        setTeam1(data?.team1?.name || "Team 1");
+        setTeam2(data?.team2?.name || "Team 2");
+        setPlayersTeam1(team1DropdownItems || []);
+        setPlayersTeam2(team2DropdownItems || []);
+        // setSelectedTossWinner(data.selectedTossWinner || "");
+        setChoice(data.choice?.name || "team1");
+        setTime(data.time || "20:00");
+        // setBonusAllowed(data.bonusAllowed?.toString() || "false");
+        // setSuperTackleAllowed(data.superTackleAllowed?.toString() || "false");
+
+        setMatchSummary(data); // Store full data in Zustand
+      } catch (error) {
+        console.error("Match setup fetch failed:", error);
+      }
+    };
+
+    fetchMatchData();
+  }, [matchId]);
+
+  // ✅ Parse and derive values
+  const team1Name = team1;
+  const team2Name = team2;
+
   const matchTime = (() => {
-    if (!time) return 600; // default 10 min
+    if (!time) return 600;
     const parts = time.split(":");
     if (parts.length !== 2) return 600;
     const minutes = parseInt(parts[0]);
@@ -48,35 +103,38 @@ export default function ScoreScreen() {
     return minutes * 60 + seconds;
   })();
 
-  const truncateName = (name: string, maxLength = 14) =>
-    name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
+  const isBonusAllowed = bonusAllowed === "true";
+  const isSuperTackleAllowed = superTackleAllowed === "true";
 
-  const displayedTeam1Name = truncateName(team1Name);
-  const displayedTeam2Name = truncateName(team2Name);
-
-  // Choose a fixed width per name based on the longest truncated name
-  const charWidth = 9; // adjust based on font size
-  const longestTruncatedLength = Math.max(
-    displayedTeam1Name.length,
-    displayedTeam2Name.length
-  );
-  const nameWidth = longestTruncatedLength * charWidth;
-  const nameBlockWidth = longestTruncatedLength * charWidth;
-
-  const initialTeam1Players: PlayerStatus[] = JSON.parse(
-    playersTeam1 || "[]"
-  ).map((name: string) => ({ name, out: false }));
-  const initialTeam2Players: PlayerStatus[] = JSON.parse(
-    playersTeam2 || "[]"
-  ).map((name: string) => ({ name, out: false }));
+  const initialTeam1Players: PlayerStatus[] = playersTeam1.map((name) => ({
+    name,
+    out: false,
+  }));
+  const initialTeam2Players: PlayerStatus[] = playersTeam2.map((name) => ({
+    name,
+    out: false,
+  }));
 
   const [team1Players, setTeam1Players] =
     useState<PlayerStatus[]>(initialTeam1Players);
   const [team2Players, setTeam2Players] =
     useState<PlayerStatus[]>(initialTeam2Players);
 
-  const isBonusAllowed = bonusAllowed === "true";
-  const isSuperTackleAllowed = superTackleAllowed === "true";
+  const truncate = (name: string, maxLength = 14) =>
+    name.length > maxLength ? name.slice(0, maxLength - 1) + "…" : name;
+
+  const displayedTeam1Name = truncate(team1Name);
+  const displayedTeam2Name = truncate(team2Name);
+
+  const charWidth = 9; // adjust based on your font styling
+  const longestTruncatedLength = Math.max(
+    displayedTeam1Name.length,
+    displayedTeam2Name.length
+  );
+
+  const nameBlockWidth = longestTruncatedLength * charWidth;
+  const nameWidth =
+    Math.max(displayedTeam1Name.length, displayedTeam2Name.length) * 9;
 
   const [team1Score, setTeam1Score] = useState(0);
   const [team2Score, setTeam2Score] = useState(0);
@@ -545,71 +603,6 @@ export default function ScoreScreen() {
     router.push("/scorecard");
   };
 
-  // const StickyScoreHeader = ({
-  //   team1Name,
-  //   team2Name,
-  //   team1Score,
-  //   team2Score,
-  // }: {
-  //   team1Name: string;
-  //   team2Name: string;
-  //   team1Score: number;
-  //   team2Score: number;
-  // }) => (
-  //   <View style={styles.stickyHeader}>
-  //     <View
-  //       style={{
-  //         flexDirection: "row",
-  //         justifyContent: "center",
-  //         alignItems: "center",
-  //         padding: 4,
-  //       }}
-  //     >
-  //       <Text
-  //         style={[
-  //           styles.stickyText,
-  //           {
-  //             width: nameWidth,
-  //             textAlign: "center",
-  //             fontWeight: "bold",
-  //             overflow: "hidden",
-  //           },
-  //         ]}
-  //         numberOfLines={1}
-  //         ellipsizeMode="tail"
-  //       >
-  //         {displayedTeam1Name}
-  //       </Text>
-
-  //       <Text
-  //         style={[
-  //           styles.stickyText,
-  //           { marginHorizontal: 4, fontWeight: "bold" },
-  //         ]}
-  //       >
-  //         {team1Score.toString().padStart(2, "0")} :{" "}
-  //         {team2Score.toString().padStart(2, "0")}
-  //       </Text>
-
-  //       <Text
-  //         style={[
-  //           styles.stickyText,
-  //           {
-  //             width: nameWidth,
-  //             textAlign: "center",
-  //             fontWeight: "bold",
-  //             overflow: "hidden",
-  //           },
-  //         ]}
-  //         numberOfLines={1}
-  //         ellipsizeMode="tail"
-  //       >
-  //         {displayedTeam2Name}
-  //       </Text>
-  //     </View>
-  //   </View>
-  // );
-
   const renderTeamSection = (
     teamNum: 1 | 2,
     teamName: string,
@@ -628,104 +621,103 @@ export default function ScoreScreen() {
     setDropdownItems: any[],
     opponentPlayers: PlayerStatus[]
   ) => {
-  const handleScore = (pts: number) => {
-  const isFoul =
-    (teamNum === 1 && team1FoulChecked) ||
-    (teamNum === 2 && team2FoulChecked);
+    const handleScore = (pts: number) => {
+      const isFoul =
+        (teamNum === 1 && team1FoulChecked) ||
+        (teamNum === 2 && team2FoulChecked);
 
-  if (!isFoul && !dropdownValue) {
-    setShowDropdownWarning(true);
-    return;
-  }
+      if (!isFoul && !dropdownValue) {
+        setShowDropdownWarning(true);
+        return;
+      }
 
-  setShowDropdownWarning(false);
-  setScore((prev) => prev + pts);
+      setShowDropdownWarning(false);
+      setScore((prev) => prev + pts);
 
-  // ❌ Removed automatic OUT logic — all outs must be manual now
-  // if (!isFoul && dropdownValue) {
-  //   const outTeam =
-  //     teamNum === 1
-  //       ? team1RaidRunning
-  //         ? 2
-  //         : 1
-  //       : team2RaidRunning
-  //       ? 1
-  //       : 2;
+      // ❌ Removed automatic OUT logic — all outs must be manual now
+      // if (!isFoul && dropdownValue) {
+      //   const outTeam =
+      //     teamNum === 1
+      //       ? team1RaidRunning
+      //         ? 2
+      //         : 1
+      //       : team2RaidRunning
+      //       ? 1
+      //       : 2;
 
-  //   const players = outTeam === 1 ? team1Players : team2Players;
-  //   const outIndex = players.findIndex((p) => p.name === dropdownValue);
+      //   const players = outTeam === 1 ? team1Players : team2Players;
+      //   const outIndex = players.findIndex((p) => p.name === dropdownValue);
 
-  //   if (outIndex !== -1) {
-  //     handleOut(outTeam, outIndex);
-  //   }
-  // }
+      //   if (outIndex !== -1) {
+      //     handleOut(outTeam, outIndex);
+      //   }
+      // }
 
-  const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
-  const setActionStack =
-    teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
-  setActionStack((prev) => [...prev, { type: "score", value: pts }]);
+      const actionStack = teamNum === 1 ? team1RaidActions : team2RaidActions;
+      const setActionStack =
+        teamNum === 1 ? setTeam1RaidActions : setTeam2RaidActions;
+      setActionStack((prev) => [...prev, { type: "score", value: pts }]);
 
-  const isRaiding =
-    (teamNum === 1 && team1RaidRunning) ||
-    (teamNum === 2 && team2RaidRunning);
+      const isRaiding =
+        (teamNum === 1 && team1RaidRunning) ||
+        (teamNum === 2 && team2RaidRunning);
 
-  if (isRaiding) {
-    if (teamNum === 1) {
-      setTeam1EmptyRaidCount(0);
-      setTeam1PendingEmpty(false);
-    } else {
-      setTeam2EmptyRaidCount(0);
-      setTeam2PendingEmpty(false);
-    }
-  }
+      if (isRaiding) {
+        if (teamNum === 1) {
+          setTeam1EmptyRaidCount(0);
+          setTeam1PendingEmpty(false);
+        } else {
+          setTeam2EmptyRaidCount(0);
+          setTeam2PendingEmpty(false);
+        }
+      }
 
-  if (teamNum === 1) {
-    if (isFoul) {
-      setTeam1FoulChecked(false);
-    } else if (team1RaidRunning && dropdownValue) {
-      setTeam1RaidPoints((prev) => prev + pts);
-      setTeam1PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-        },
-      }));
-    } else if (!team1RaidRunning && dropdownValue) {
-      setTeam1TacklePoints((prev) => prev + pts);
-      setTeam1PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-        },
-      }));
-    }
-  } else if (teamNum === 2) {
-    if (isFoul) {
-      setTeam2FoulChecked(false);
-    } else if (team2RaidRunning && dropdownValue) {
-      setTeam2RaidPoints((prev) => prev + pts);
-      setTeam2PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
-        },
-      }));
-    } else if (!team2RaidRunning && dropdownValue) {
-      setTeam2TacklePoints((prev) => prev + pts);
-      setTeam2PlayerStats((prev) => ({
-        ...prev,
-        [dropdownValue]: {
-          ...prev[dropdownValue],
-          defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
-        },
-      }));
-    }
-  }
-};
-
+      if (teamNum === 1) {
+        if (isFoul) {
+          setTeam1FoulChecked(false);
+        } else if (team1RaidRunning && dropdownValue) {
+          setTeam1RaidPoints((prev) => prev + pts);
+          setTeam1PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+            },
+          }));
+        } else if (!team1RaidRunning && dropdownValue) {
+          setTeam1TacklePoints((prev) => prev + pts);
+          setTeam1PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+            },
+          }));
+        }
+      } else if (teamNum === 2) {
+        if (isFoul) {
+          setTeam2FoulChecked(false);
+        } else if (team2RaidRunning && dropdownValue) {
+          setTeam2RaidPoints((prev) => prev + pts);
+          setTeam2PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              raidPoints: (prev[dropdownValue]?.raidPoints || 0) + pts,
+            },
+          }));
+        } else if (!team2RaidRunning && dropdownValue) {
+          setTeam2TacklePoints((prev) => prev + pts);
+          setTeam2PlayerStats((prev) => ({
+            ...prev,
+            [dropdownValue]: {
+              ...prev[dropdownValue],
+              defensePoints: (prev[dropdownValue]?.defensePoints || 0) + pts,
+            },
+          }));
+        }
+      }
+    };
 
     const isDefending =
       (teamNum === 1 && team2RaidRunning) ||
@@ -835,7 +827,7 @@ export default function ScoreScreen() {
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {truncateName(teamName)}
+            {truncate(teamName)}
           </Text>
 
           {renderDots(players)}
@@ -1000,7 +992,7 @@ export default function ScoreScreen() {
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      {truncateName(p.name)}
+                      {truncate(p.name)}
                     </Text>
                     <TouchableOpacity onPress={() => handleOut(teamNum, idx)}>
                       <Text style={styles.outBtn}>Out</Text>
@@ -1253,8 +1245,8 @@ export default function ScoreScreen() {
         {/* Title and Score */}
         <View style={styles.titleContainer}>
           <Text style={styles.headerTitle}>
-            {truncateName(team1Name)} <Text style={styles.vstext}>v/s</Text>{" "}
-            {truncateName(team2Name)}
+            {truncate(team1Name)} <Text style={styles.vstext}>v/s</Text>{" "}
+            {truncate(team2Name)}
           </Text>
 
           <Text style={styles.headerScore}>
@@ -1484,7 +1476,7 @@ export default function ScoreScreen() {
             setTeam1DropdownValue,
             team1DropdownItems,
             setTeam1DropdownItems,
-            team2Players
+            team1Players
           )}
 
           {renderTeamSection(

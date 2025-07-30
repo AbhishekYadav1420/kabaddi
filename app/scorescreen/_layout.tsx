@@ -47,6 +47,5 @@ export default function ScoreScreenLayout() {
         }}
       />
     </Tabs>
-     
   );
 }

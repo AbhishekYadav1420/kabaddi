@@ -1,5 +1,4 @@
-
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
@@ -7,7 +6,7 @@ export default function teamadd() {
   return (
   <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#6200ee',
+        tabBarActiveTintColor: '#2e06b3ff',
         headerShown: false,
       }}
     >
@@ -16,7 +15,7 @@ export default function teamadd() {
         options={{
           title: 'New Match',
           tabBarIcon: ({ color, size }) => (
-            <FontAwesome5 name="clipboard-list" size={size} color={color} />
+            <MaterialCommunityIcons name='kabaddi' size={size} color={color} />
           ),
         }}
       />

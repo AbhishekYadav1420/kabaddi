@@ -84,7 +84,7 @@ const IndexScreen = () => {
   const initialValues = {
     team1Name: "",
     team2Name: "",
-    halfTime: "", // e.g., '10:00'
+    halfTime: "00:20:00", // e.g., '10:00'
     tossWinning: 0, // 0 for team1, 1 for team2
     tossChoice: 0, // 0 for Raid, 1 for Ground
     team1Players: [],
@@ -297,7 +297,7 @@ const IndexScreen = () => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Time (mm:ss)</Text>
               <TextInput
-                placeholder="mm:ss"
+                placeholder="hr:mm:ss"
                 style={styles.input}
                 value={values.halfTime}
                 onChangeText={handleChange("halfTime")}
